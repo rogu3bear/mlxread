@@ -1,0 +1,93 @@
+# MLXRead — xcodegen project definition.
+# Regenerate with: xcodegen generate
+#
+# Configurable identity lives here in one place:
+#   - bundle id prefix / PRODUCT_BUNDLE_IDENTIFIER
+#   - DEVELOPMENT_TEAM
+name: MLXRead
+options:
+  bundleIdPrefix: me.jkca
+  deploymentTarget:
+    macOS: "14.0"
+  createIntermediateGroups: true
+
+settings:
+  base:
+    MARKETING_VERSION: 0.1.0
+    CURRENT_PROJECT_VERSION: 1
+    SWIFT_VERSION: "5.0"
+    SWIFT_STRICT_CONCURRENCY: complete
+    DEVELOPMENT_TEAM: NB3G4L6ZD4
+    CODE_SIGN_STYLE: Automatic
+    ENABLE_HARDENED_RUNTIME: NO
+    ENABLE_USER_SCRIPT_SANDBOXING: YES
+    MACOSX_DEPLOYMENT_TARGET: "14.0"
+
+packages:
+  MLXAudio:
+    url: https://github.com/Blaizzy/mlx-audio-swift
+    exactVersion: 0.1.3
+
+targets:
+  MLXRead:
+    type: application
+    platform: macOS
+    sources:
+      - path: MLXRead
+    dependencies:
+      - package: MLXAudio
+        products:
+          - MLXAudioTTS
+          - MLXAudioCore
+    info:
+      path: MLXRead/Resources/Info.plist
+      properties:
+        CFBundleDisplayName: MLXRead
+        CFBundleName: MLXRead
+        LSUIElement: true
+        LSMinimumSystemVersion: "14.0"
+        LSApplicationCategoryType: public.app-category.utilities
+        NSHumanReadableCopyright: "© 2026 James Auchterlonie. MIT licensed."
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: me.jkca.mlxread
+        PRODUCT_NAME: MLXRead
+
+  MLXReadTests:
+    type: bundle.unit-test
+    platform: macOS
+    sources:
+      - path: MLXReadTests
+    dependencies:
+      - target: MLXRead
+    settings:
+      base:
+        GENERATE_INFOPLIST_FILE: YES
+
+  MLXReadUITests:
+    type: bundle.ui-testing
+    platform: macOS
+    sources:
+      - path: MLXReadUITests
+    dependencies:
+      - target: MLXRead
+    settings:
+      base:
+        GENERATE_INFOPLIST_FILE: YES
+
+schemes:
+  MLXRead:
+    build:
+      targets:
+        MLXRead: all
+        MLXReadTests: [test]
+        MLXReadUITests: [test]
+    run:
+      config: Debug
+    test:
+      config: Debug
+      gatherCoverageData: false
+      targets:
+        - MLXReadTests
+    archive:
+      config: Release

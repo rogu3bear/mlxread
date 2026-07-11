@@ -1,0 +1,6 @@
+# Codex environment definition for MLXRead.
+[environment]
+name = "mlxread"
+
+[run]
+command = "./script/build_and_run.sh"
