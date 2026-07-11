@@ -9,7 +9,13 @@ import Observation
 @MainActor
 @Observable
 final class SpeechCoordinator {
-    private(set) var state: SpeechState = .idle
+    private(set) var state: SpeechState = .idle {
+        didSet {
+            if state != oldValue {
+                AppLogger.speech.notice("State: \(oldValue.displayName, privacy: .public) → \(self.state.displayName, privacy: .public)")
+            }
+        }
+    }
     /// True when the last read had to truncate the selection.
     private(set) var lastReadWasTruncated = false
 
