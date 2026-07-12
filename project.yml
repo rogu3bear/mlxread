@@ -61,6 +61,10 @@ targets:
       properties:
         CFBundleDisplayName: MLXRead
         CFBundleName: MLXRead
+        # Track the build settings (project.yml:16-17) so the app reports its
+        # real release version instead of xcodegen's 1.0/1 default.
+        CFBundleShortVersionString: "$(MARKETING_VERSION)"
+        CFBundleVersion: "$(CURRENT_PROJECT_VERSION)"
         LSUIElement: true
         LSMinimumSystemVersion: "14.0"
         LSApplicationCategoryType: public.app-category.utilities
@@ -76,6 +80,7 @@ targets:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: me.jkca.mlxread
         PRODUCT_NAME: MLXRead
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
 
   SystemVoiceProvider:
     type: app-extension

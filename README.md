@@ -7,7 +7,8 @@ stops instantly.
 
 **[Download the latest release](https://github.com/rogu3bear/mlxread/releases/latest)** (Developer ID–signed `.app`, macOS 14+ · Apple Silicon) · **Website & demo:** [mlxread-web.pages.dev](https://mlxread-web.pages.dev)
 
-- Menu-bar utility (no Dock icon), SwiftUI + AppKit at the edges
+- Menu-bar utility (no Dock icon), SwiftUI + AppKit at the edges; optional
+  **launch at login** keeps it always on, a keystroke away
 - Local synthesis via [mlx-audio-swift](https://github.com/Blaizzy/mlx-audio-swift)
   — Kokoro 82M (default, 54 voices) or Soprano 80M (fast, English)
 - Selection capture via the Accessibility API, with a clipboard-preserving
@@ -101,7 +102,13 @@ script/test.sh --ui            # + UI launch smoke test
 script/benchmark.sh [soprano|kokoro|all]   # measured synthesis benchmark
 script/package.sh              # → dist/MLXRead.app + dist/MLXRead.zip (signed)
 script/notarize.sh             # notarize + staple + update the GitHub release
+script/clean.sh                # trash scattered build-dir apps; keep only dist/
 ```
+
+`dist/MLXRead.app` is the one app you should ever launch — signed and notarized.
+Builds also drop a copy in `build/DerivedData` (and the benchmark tree); `build/`
+is excluded from Spotlight and `script/clean.sh` trashes those stray copies so a
+stale or unsigned build can't be opened by accident.
 
 ### Notarizing a release (one command)
 
@@ -128,8 +135,10 @@ Status and evidence: [docs/system-voice-provider.md](docs/system-voice-provider.
 
 A marketing + demo site lives in [`website/`](website/) — Leptos SSR with an
 interactive ⌥⎋ demo, deployed to Cloudflare Pages at
-**https://mlxread-web.pages.dev**. Details in
-[website/README.md](website/README.md).
+**https://mlxread-web.pages.dev**. It also hosts the
+[FAQ](https://mlxread-web.pages.dev/faq) and a
+[Support](https://mlxread-web.pages.dev/support) page with a contact form.
+Details in [website/README.md](website/README.md).
 
 ## Troubleshooting
 
@@ -164,6 +173,22 @@ interactive ⌥⎋ demo, deployed to Cloudflare Pages at
 - The published `.app` is Developer ID–signed, hardened-runtime, and
   **notarized by Apple** — it opens without a Gatekeeper prompt. Re-cut a
   notarized release anytime with `./script/notarize.sh`.
+
+## Support
+
+- **In the app:** Settings → **Report** attaches a privacy-safe debug bundle
+  (never your text — only versions, model/permission state, and recent logs)
+  and sends it straight to the maintainer.
+- **FAQ & troubleshooting:**
+  [mlxread-web.pages.dev/faq](https://mlxread-web.pages.dev/faq) and
+  [/support](https://mlxread-web.pages.dev/support), which has a contact form.
+- **Bugs & features:** open an issue at
+  [github.com/rogu3bear/mlxread/issues](https://github.com/rogu3bear/mlxread/issues).
+- **Security:** see [SECURITY.md](SECURITY.md) — please report privately first.
+
+The contact/report backend is a small Cloudflare Worker in [`api/`](api/) that
+emails the maintainer over Cloudflare Email Routing; the maintainer address is
+never exposed to users.
 
 ## Licenses
 

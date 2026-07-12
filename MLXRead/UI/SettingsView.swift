@@ -11,6 +11,8 @@ struct SettingsView: View {
                 .tabItem { Label("Models", systemImage: "internaldrive") }
             PermissionView()
                 .tabItem { Label("Permissions", systemImage: "lock.shield") }
+            ReportProblemView()
+                .tabItem { Label("Report", systemImage: "exclamationmark.bubble") }
         }
         .frame(width: 480)
         .fixedSize(horizontal: false, vertical: true)

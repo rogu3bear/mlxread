@@ -28,6 +28,12 @@ struct GeneralSettingsView: View {
                     get: { appState.launchAtLoginEnabled },
                     set: { appState.setLaunchAtLogin($0) }
                 ))
+                Text("Keeps MLXRead always on — it starts with your Mac and waits in the menu bar, a keystroke away.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
+            Section {
                 Toggle("Clipboard fallback for apps without Accessibility text", isOn: $settings.clipboardFallbackEnabled)
                 Toggle("Show floating playback controller", isOn: $settings.showPlaybackHUD)
                 Toggle("Show selection preview in this window (kept off by default)", isOn: $settings.showSelectionPreview)
