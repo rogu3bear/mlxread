@@ -654,6 +654,21 @@ button {
   gap: 32px;
   align-items: start;
 }
+.install__get {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.install__hint {
+  font-size: 0.8rem;
+  line-height: 1.6;
+}
+.install__hint b {
+  color: var(--ink);
+}
+.dl-size {
+  color: var(--amber);
+}
 .terminal__body {
   margin: 0;
   padding: 20px;
@@ -723,19 +738,105 @@ button {
   padding: 40px 24px;
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 14px;
+}
+.footer__top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 16px;
+  padding-bottom: 14px;
+  border-bottom: 1px solid var(--line);
 }
 .footer__brand {
   display: flex;
   align-items: center;
   gap: 8px;
+  text-decoration: none;
+  color: var(--ink);
+}
+.footer__links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 18px;
+}
+.footer__links a {
+  color: var(--ink-2);
+  text-decoration: none;
+  font-size: 0.92rem;
+}
+.footer__links a:hover {
+  color: var(--amber);
 }
 .footer__note {
-  max-width: 60ch;
+  max-width: 62ch;
   font-size: 0.9rem;
 }
-.footer__built {
+.footer__by {
+  display: flex;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 10px;
   font-size: 0.78rem;
+}
+.footer__by a {
+  color: var(--ink-2);
+  text-decoration: none;
+}
+.footer__by a:hover {
+  color: var(--amber);
+}
+
+/* ---- Legal pages ---- */
+.legal {
+  max-width: 760px;
+}
+.legal h1 {
+  font-size: clamp(2rem, 3.4vw, 2.8rem);
+  margin-top: 8px;
+}
+.legal__updated {
+  margin: 12px 0 26px;
+  font-size: 0.78rem;
+}
+.legal__lede {
+  font-size: 1.1rem;
+  color: var(--ink-2);
+  margin-bottom: 12px;
+}
+.legal__section {
+  margin-top: 34px;
+}
+.legal__section h2 {
+  font-size: 1.3rem;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--line);
+  margin-bottom: 16px;
+}
+.legal__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 12px;
+}
+.legal__list li {
+  position: relative;
+  padding-left: 20px;
+  color: var(--ink-2);
+}
+.legal__list li::before {
+  content: "—";
+  position: absolute;
+  left: 0;
+  color: var(--amber);
+}
+.legal__list a {
+  color: var(--amber);
+}
+.legal__back {
+  margin-top: 40px;
 }
 
 .notfound {

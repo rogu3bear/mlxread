@@ -4,9 +4,11 @@ use leptos::prelude::*;
 
 use crate::components::widgets::{OptEsc, Waveform};
 
-/// Intended source home. In-page CTAs use anchors (always live); this is the
-/// external "view source" target and is the single place to update the slug.
-const REPO_URL: &str = "https://github.com/mlnavigator/mlxread";
+/// Source home and the signed-release download. Update the slug in one place.
+pub const REPO_URL: &str = "https://github.com/rogu3bear/mlxread";
+/// The latest signed .app zip from GitHub Releases (stable "latest" URL).
+pub const DOWNLOAD_URL: &str =
+    "https://github.com/rogu3bear/mlxread/releases/latest/download/MLXRead.zip";
 
 #[derive(Clone, Copy, PartialEq, Eq)]
 enum Phase {
@@ -114,11 +116,14 @@ fn HeroDemo() -> impl IntoView {
                     ", and hear it in about a second. Nothing is uploaded. Nothing is logged."
                 </p>
                 <div class="hero__actions">
-                    <a class="btn btn--primary" href="#install">"Build from source"</a>
+                    <a class="btn btn--primary" href=DOWNLOAD_URL rel="noopener">
+                        "Download for macOS"
+                    </a>
                     <a class="btn btn--ghost" href="#how">"See how it works"</a>
                 </div>
                 <p class="hero__foot mono muted">
-                    "Local synthesis · no accounts · no telemetry · works offline"
+                    "Universal · macOS 14+ · Apple Silicon · signed · ~"
+                    <span class="dl-size">"40 MB"</span>
                 </p>
             </div>
 
@@ -350,25 +355,35 @@ fn OpenSource() -> impl IntoView {
             <section id="install" class="band">
                 <header class="band__head">
                     <p class="eyebrow">"Open, and yours"</p>
-                    <h2>"Read the code. Build it yourself."</h2>
+                    <h2>"Download it, or build it yourself."</h2>
                     <p class="band__sub">
-                        "MLXRead is MIT-licensed. Updates ship through Sparkle with EdDSA-signed appcasts — every update is verified before it installs."
+                        "MLXRead is MIT-licensed and signed with a Developer ID. Updates ship through Sparkle with EdDSA-signed appcasts — every update is verified before it installs."
                     </p>
                 </header>
 
                 <div class="install">
-                    <div class="terminal">
-                        <div class="titlebar">
-                            <span class="lights"><i></i><i></i><i></i></span>
-                            <span class="titlebar__label mono">"zsh — build"</span>
-                        </div>
-                        <pre class="terminal__body mono">
+                    <div class="install__get">
+                        <a class="btn btn--primary" href=DOWNLOAD_URL rel="noopener">
+                            "Download MLXRead.app"
+                        </a>
+                        <p class="mono muted install__hint">
+                            "Unzip, drag to Applications. First launch: right-click the app → "
+                            <b>"Open"</b>
+                            " (signed, not yet notarized, so Gatekeeper asks once)."
+                        </p>
+                        <div class="terminal">
+                            <div class="titlebar">
+                                <span class="lights"><i></i><i></i><i></i></span>
+                                <span class="titlebar__label mono">"zsh — build from source"</span>
+                            </div>
+                            <pre class="terminal__body mono">
     <span class="cmt">"# macOS 14+, Apple Silicon, Xcode"</span>"\n"
-    <span class="pr">"$ "</span>"brew install xcodegen\n"
-    <span class="pr">"$ "</span>"xcodegen generate\n"
+    <span class="pr">"$ "</span>"git clone https://github.com/rogu3bear/mlxread\n"
+    <span class="pr">"$ "</span>"brew install xcodegen && xcodegen generate\n"
     <span class="pr">"$ "</span>"script/build_and_run.sh --verify\n"
     <span class="ok">"==> Verify OK — MLXRead is running"</span>
-                        </pre>
+                            </pre>
+                        </div>
                     </div>
                     <div class="install__notes">
                         <div class="note">
@@ -386,9 +401,9 @@ fn OpenSource() -> impl IntoView {
                             </p>
                         </div>
                         <div class="note">
-                            <h3>"Honest status"</h3>
+                            <h3>"Auto-updates"</h3>
                             <p>
-                                "There's no notarized binary yet — build from source today. A signed, notarized release with auto-updates is the next step."
+                                "Once installed, MLXRead keeps itself current through Sparkle — signed updates pulled from the same GitHub releases, verified before install."
                             </p>
                         </div>
                         <a class="btn btn--ghost" href=REPO_URL rel="noopener" target="_blank">

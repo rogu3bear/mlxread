@@ -7,6 +7,7 @@ use leptos_router::{
 
 use crate::components::app_layout::AppLayout;
 use crate::components::home_page::HomePage;
+use crate::components::legal_page::{PrivacyPage, TermsPage};
 
 #[allow(dead_code)]
 pub fn shell(options: LeptosOptions) -> impl IntoView {
@@ -54,6 +55,8 @@ pub fn App() -> impl IntoView {
             <AppLayout>
                 <Routes fallback=|| view! { <NotFoundPage/> }.into_view()>
                     <Route path=StaticSegment("") view=HomePage ssr=SsrMode::OutOfOrder/>
+                    <Route path=StaticSegment("privacy") view=PrivacyPage ssr=SsrMode::OutOfOrder/>
+                    <Route path=StaticSegment("terms") view=TermsPage ssr=SsrMode::OutOfOrder/>
                     // Must be last: guarantees deep links and hard refreshes get
                     // a full SSR HTML shell on the edge.
                     <Route path=WildcardSegment("any") view=NotFoundPage ssr=SsrMode::OutOfOrder/>
