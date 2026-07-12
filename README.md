@@ -99,8 +99,23 @@ script/test.sh                 # unit tests (fast, no network, no models)
 script/test.sh --integration   # + real model download & synthesis tests
 script/test.sh --ui            # + UI launch smoke test
 script/benchmark.sh [soprano|kokoro|all]   # measured synthesis benchmark
-script/package.sh              # → dist/MLXRead.app (Development-signed, NOT notarized)
+script/package.sh              # → dist/MLXRead.app + dist/MLXRead.zip (signed)
+script/notarize.sh             # notarize + staple + update the GitHub release
 ```
+
+### Notarizing a release (one command)
+
+`script/notarize.sh` builds (if needed), notarizes with Apple, staples the
+ticket, re-zips, and updates the GitHub release — a single command:
+
+```bash
+./script/notarize.sh
+```
+
+The first run prompts once for your Apple ID and an app-specific password
+(create one at appleid.apple.com → Sign-In & Security), storing them in your
+Keychain; every run after is automatic. After notarization, users no longer see
+a Gatekeeper prompt on first launch.
 
 Measured results for this machine are recorded in
 [docs/testing.md](docs/testing.md).
@@ -146,7 +161,9 @@ interactive ⌥⎋ demo, deployed to Cloudflare Pages at
   nothing else wrote to it mid-capture (by design).
 - PDF viewers must expose a text layer through Accessibility or respond
   to ⌘C for capture to work.
-- Not notarized; local/dev distribution only.
+- The published `.app` is Developer ID–signed with hardened runtime but not
+  yet notarized, so first launch shows a Gatekeeper prompt (right-click → Open).
+  Run `./script/notarize.sh` once to notarize and remove that prompt.
 
 ## Licenses
 
