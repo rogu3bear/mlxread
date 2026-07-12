@@ -107,6 +107,13 @@ Measured results for this machine are recorded in
 
 Status and evidence: [docs/system-voice-provider.md](docs/system-voice-provider.md).
 
+## Website
+
+A marketing + demo site lives in [`website/`](website/) — Leptos SSR on
+Cloudflare Workers with an interactive ⌥⎋ demo. Build it with
+`cd website && bash scripts/build-edge.sh`; details in
+[website/README.md](website/README.md).
+
 ## Troubleshooting
 
 - **⌥⎋ does nothing** — check Settings → Permissions; the event tap needs
