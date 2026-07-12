@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-labelledby="t">
+  <title id="t">MLXRead app icon</title>
+  <defs>
+    <linearGradient id="amber" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#ffc063"/>
+      <stop offset="1" stop-color="#b9781f"/>
+    </linearGradient>
+  </defs>
+  <rect width="512" height="512" rx="114" fill="#111116"/>
+  <rect x="0.5" y="0.5" width="511" height="511" rx="113.5" fill="none" stroke="#ffffff" stroke-opacity="0.08"/>
+  <g fill="url(#amber)">
+    <rect x="96"  y="216" width="34" height="80"  rx="17"/>
+    <rect x="150" y="176" width="34" height="160" rx="17"/>
+    <rect x="204" y="128" width="34" height="256" rx="17"/>
+    <rect x="258" y="192" width="34" height="128" rx="17"/>
+    <rect x="312" y="152" width="34" height="208" rx="17"/>
+    <rect x="366" y="200" width="34" height="112" rx="17"/>
+  </g>
+</svg>

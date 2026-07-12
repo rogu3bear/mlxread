@@ -1,0 +1,117 @@
+use leptos::prelude::*;
+use leptos_meta::{provide_meta_context, Meta, MetaTags, Title};
+use leptos_router::{
+    components::{Route, Router, Routes},
+    SsrMode, StaticSegment, WildcardSegment,
+};
+
+use crate::components::app_layout::AppLayout;
+use crate::components::home_page::HomePage;
+
+#[allow(dead_code)]
+pub fn shell(options: LeptosOptions) -> impl IntoView {
+    view! {
+        <!DOCTYPE html>
+        <html lang="en">
+            <head>
+                <meta charset="utf-8"/>
+                <meta name="viewport" content="width=device-width, initial-scale=1"/>
+                <link rel="icon" href="/favicon.svg" type="image/svg+xml"/>
+                <link rel="apple-touch-icon" href="/apple-touch-icon.png"/>
+                <link rel="manifest" href="/site.webmanifest"/>
+                <meta name="theme-color" content="#0d0d0f"/>
+                <AutoReload options=options.clone()/>
+                <HashedStylesheet options=options.clone()/>
+                <EdgeHydrationScripts options=options/>
+                <MetaTags/>
+            </head>
+            <body>
+                <App/>
+            </body>
+        </html>
+    }
+}
+
+#[component]
+pub fn App() -> impl IntoView {
+    provide_meta_context();
+
+    view! {
+        <Title text="MLXRead — local, private speak-selection for macOS"/>
+        <Meta
+            name="description"
+            content="Press Option-Escape in any Mac app to hear the selection read aloud by a local MLX text-to-speech model. Nothing leaves your Mac. Open source."
+        />
+        <Meta name="color-scheme" content="dark"/>
+        <Meta property="og:title" content="MLXRead"/>
+        <Meta
+            property="og:description"
+            content="Option-Escape reads your selection aloud with a local model. On-device, private, open source."
+        />
+        <Meta property="og:type" content="website"/>
+
+        <Router>
+            <AppLayout>
+                <Routes fallback=|| view! { <NotFoundPage/> }.into_view()>
+                    <Route path=StaticSegment("") view=HomePage ssr=SsrMode::OutOfOrder/>
+                    // Must be last: guarantees deep links and hard refreshes get
+                    // a full SSR HTML shell on the edge.
+                    <Route path=WildcardSegment("any") view=NotFoundPage ssr=SsrMode::OutOfOrder/>
+                </Routes>
+            </AppLayout>
+        </Router>
+    }
+}
+
+#[component]
+fn NotFoundPage() -> impl IntoView {
+    view! {
+        <main class="shell">
+            <section class="notfound">
+                <p class="mono muted">"404"</p>
+                <h1>"That page is not here."</h1>
+                <a class="btn btn--primary" href="/">"Back to MLXRead"</a>
+            </section>
+        </main>
+    }
+}
+
+#[component]
+fn HashedStylesheet(options: LeptosOptions) -> impl IntoView {
+    let href = asset_href(&options, "css", crate::asset_hashes::CSS_HASH);
+
+    view! {
+        <link id="leptos" rel="stylesheet" href=href/>
+    }
+}
+
+#[component]
+fn EdgeHydrationScripts(options: LeptosOptions) -> impl IntoView {
+    let js_href = asset_href(&options, "js", crate::asset_hashes::JS_HASH);
+    let wasm_href = asset_href(&options, "wasm", crate::asset_hashes::WASM_HASH);
+    let hydration_script = format!(
+        "import({js_href:?}).then(mod => {{ mod.default({{ module_or_path: {wasm_href:?} }}).then(() => {{ mod.hydrate(); }}); }});"
+    );
+
+    view! {
+        <link rel="modulepreload" href=js_href.clone()/>
+        <link rel="preload" href=wasm_href.clone() r#as="fetch" r#type="application/wasm"/>
+        <script type="module">{hydration_script}</script>
+    }
+}
+
+fn asset_href(options: &LeptosOptions, extension: &str, hash: &str) -> String {
+    let output_name = options.output_name.as_ref();
+    let output_name = if output_name.is_empty() {
+        env!("CARGO_PKG_NAME")
+    } else {
+        output_name
+    };
+    let pkg_dir = options.site_pkg_dir.as_ref();
+
+    if hash.is_empty() {
+        format!("/{pkg_dir}/{output_name}.{extension}")
+    } else {
+        format!("/{pkg_dir}/{output_name}.{hash}.{extension}")
+    }
+}
