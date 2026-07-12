@@ -139,7 +139,16 @@ final class AppState {
         }
         permissions.onChange = { [weak self] trusted in
             guard let self else { return }
-            if trusted { self.installHotkeyIfPossible() }
+            if trusted {
+                self.installHotkeyIfPossible()
+            } else {
+                // Trust was revoked while running: the tap is now dead weight
+                // and any active read must stop cleanly.
+                self.teardownHotkey()
+                if self.coordinator.state.isBusy {
+                    self.coordinator.stop()
+                }
+            }
             self.coordinator.refreshAvailability()
         }
         coordinator.refreshAvailability()
@@ -157,15 +166,22 @@ final class AppState {
             try service.start()
             hotkey = service
             hotkeyInstalled = true
+            AppLogger.hotkey.info("Global shortcut installed")
         } catch {
             hotkeyInstalled = false
             AppLogger.hotkey.error("Hotkey install failed despite trust; will retry on permission change")
         }
     }
 
-    func shutdown() {
+    func teardownHotkey() {
         hotkey?.stop()
         hotkey = nil
+        hotkeyInstalled = false
+    }
+
+    func shutdown() {
+        permissions.stopMonitoring()
+        teardownHotkey()
     }
 
     // MARK: - Memory pressure

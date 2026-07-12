@@ -23,6 +23,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         guard !Self.isRunningTests else { return }
 
         appState.permissions.refresh()
+        appState.permissions.startMonitoring()
         appState.installHotkeyIfPossible()
         appState.coordinator.refreshAvailability()
 

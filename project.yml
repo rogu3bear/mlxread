@@ -19,9 +19,19 @@ settings:
     SWIFT_STRICT_CONCURRENCY: complete
     DEVELOPMENT_TEAM: NB3G4L6ZD4
     CODE_SIGN_STYLE: Automatic
-    ENABLE_HARDENED_RUNTIME: NO
     ENABLE_USER_SCRIPT_SANDBOXING: YES
     MACOSX_DEPLOYMENT_TARGET: "14.0"
+  configs:
+    Debug:
+      # Debug keeps get-task-allow for the debugger and XCTest injection.
+      ENABLE_HARDENED_RUNTIME: NO
+    Release:
+      # Hardened Runtime is required for notarization and, with a Developer ID
+      # (distribution) signature at release time, strips get-task-allow — the
+      # concrete fix for TM-001 (process-memory scraping). No extra
+      # entitlements are needed: MLXRead uses no JIT / no library-injection,
+      # and embedded Sparkle code is signed with the same team.
+      ENABLE_HARDENED_RUNTIME: YES
 
 packages:
   MLXAudio:
