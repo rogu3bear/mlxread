@@ -109,9 +109,9 @@ Status and evidence: [docs/system-voice-provider.md](docs/system-voice-provider.
 
 ## Website
 
-A marketing + demo site lives in [`website/`](website/) — Leptos SSR on
-Cloudflare Workers with an interactive ⌥⎋ demo. Build it with
-`cd website && bash scripts/build-edge.sh`; details in
+A marketing + demo site lives in [`website/`](website/) — Leptos SSR with an
+interactive ⌥⎋ demo, deployed to Cloudflare Pages at
+**https://mlxread-web.pages.dev**. Details in
 [website/README.md](website/README.md).
 
 ## Troubleshooting

@@ -45,13 +45,28 @@ Requires the pinned toolchain: `cargo-leptos 0.3.5`, `worker-build 0.7.5`,
 
 ## Deploy
 
-Set your Cloudflare account and run:
+**Live:** https://mlxread-web.pages.dev (Cloudflare Pages).
+
+The site deploys to **Cloudflare Pages** in advanced mode. Because Pages
+requires a Module-syntax worker (`export default { fetch }`) and does not serve
+static assets automatically, `scripts/build-pages.sh` wraps the worker-build
+output in a thin module worker (`scripts/pages-worker-entry.js`) that serves
+assets via `env.ASSETS` and delegates everything else to the Leptos SSR worker.
 
 ```bash
-bunx wrangler@4.83.0 deploy
+bash ./scripts/build-pages.sh                 # -> dist-pages/ (assets + _worker.js/)
+bunx wrangler@4.83.0 pages dev dist-pages      # local preview on the Pages runtime
+bunx wrangler@4.83.0 pages deploy dist-pages \
+  --project-name mlxread-web --branch main     # deploy (main = production)
 ```
 
-`wrangler.toml` is D1-free; the site is a static SSR surface with no data layer.
+Project created once with:
+`wrangler pages project create mlxread-web --production-branch main --compatibility-date 2026-04-22`
+(the compatibility date must support `WorkerEntrypoint`).
+
+`wrangler.toml` (the `main` + `[assets]` Workers config) is kept for
+`cargo leptos` / `build-edge.sh` and local `wrangler dev`; the Pages path uses
+`dist-pages/` instead. There is no D1 / data layer.
 
 ## Design intent
 

@@ -19,3 +19,6 @@ ANCHOR.md
 .agents/
 .claude/
 *.local.md
+
+# Cloudflare Pages build output
+dist-pages/
