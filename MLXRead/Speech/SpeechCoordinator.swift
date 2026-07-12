@@ -186,7 +186,7 @@ final class SpeechCoordinator {
     private func text(from result: SelectionCaptureResult) throws -> String {
         switch result {
         case .text(let text, let source):
-            AppLogger.selection.info("Captured \(text.count) chars via \(source.rawValue)")
+            AppLogger.selection.info("Captured \(text.count) chars via \(source.rawValue, privacy: .public)")
             return text
         case .noSelection:
             throw UserFacingSpeechError.noSelectionFound

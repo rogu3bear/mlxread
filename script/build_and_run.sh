@@ -58,7 +58,7 @@ if [[ $VERIFY -eq 1 ]]; then
   fi
   echo "    process: running (pid $(pgrep -x MLXRead | head -1))"
   codesign --verify --deep --strict "$APP"
-  echo "    codesign: valid ($(codesign -dv "$APP" 2>&1 | grep '^Authority' | head -1 || echo 'ad hoc'))"
+  echo "    codesign: valid ($(codesign -dvvv "$APP" 2>&1 | grep '^Authority' | head -1 || echo 'ad hoc'))"
   echo "    bundle id: $(defaults read "$(pwd)/$APP/Contents/Info" CFBundleIdentifier)"
   echo "==> Verify OK"
 fi

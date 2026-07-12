@@ -11,6 +11,9 @@ CONFIGURATION=Release
 APP="$DERIVED/Build/Products/$CONFIGURATION/MLXRead.app"
 
 echo "==> Building ($CONFIGURATION)"
+# Remove any stale product first (a prior hosted-test build can leave an
+# xctest bundle inside the app, which breaks release code signing).
+rm -rf "$APP"
 xcodebuild \
   -project MLXRead.xcodeproj \
   -scheme MLXRead \

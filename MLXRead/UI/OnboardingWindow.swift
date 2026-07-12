@@ -89,10 +89,24 @@ final class OnboardingWindowController {
             .environment(appState.settings)
             .environment(appState)
 
-            let window = NSWindow(contentViewController: NSHostingController(rootView: AnyView(view)))
+            // Automatic SwiftUI window sizing must stay OFF here: on this
+            // macOS build, the hosting view's window-resize during ordering
+            // (`setFrameSize` → safe-area invalidation) lands inside the
+            // display cycle and AppKit aborts the process with
+            // "_postWindowNeedsUpdateConstraints during display cycle".
+            // Fixed content rect + sizingOptions = [] avoids that path.
+            let hosting = NSHostingView(rootView: AnyView(view))
+            hosting.sizingOptions = []
+            let window = NSWindow(
+                contentRect: NSRect(x: 0, y: 0, width: 480, height: 440),
+                styleMask: [.titled, .closable],
+                backing: .buffered,
+                defer: false
+            )
             window.title = "MLXRead Setup"
-            window.styleMask = [.titled, .closable]
             window.isReleasedWhenClosed = false
+            hosting.frame = NSRect(x: 0, y: 0, width: 480, height: 440)
+            window.contentView = hosting
             window.center()
             self.window = window
         }

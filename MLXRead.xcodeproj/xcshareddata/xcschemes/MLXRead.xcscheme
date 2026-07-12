@@ -78,6 +78,17 @@
                ReferencedContainer = "container:MLXRead.xcodeproj">
             </BuildableReference>
          </TestableReference>
+         <TestableReference
+            skipped = "NO"
+            parallelizable = "NO">
+            <BuildableReference
+               BuildableIdentifier = "primary"
+               BlueprintIdentifier = "8D5844F7A5B781BE297548C6"
+               BuildableName = "MLXReadUITests.xctest"
+               BlueprintName = "MLXReadUITests"
+               ReferencedContainer = "container:MLXRead.xcodeproj">
+            </BuildableReference>
+         </TestableReference>
       </Testables>
       <CommandLineArguments>
       </CommandLineArguments>

@@ -20,14 +20,19 @@ esac
 LOG="$(mktemp -t mlxread-benchmark)"
 export TEST_RUNNER_MLXREAD_BENCHMARK=1
 
+# Own DerivedData: Release benchmark builds never contend with Debug work.
+# ENABLE_TESTABILITY is required for @testable import in Release.
 set +e
 xcodebuild test \
   -project MLXRead.xcodeproj \
   -scheme MLXRead \
   -configuration Release \
-  -derivedDataPath build/DerivedData \
+  -derivedDataPath build/DerivedDataBench \
+  -destination 'platform=macOS,arch=arm64' \
   -skipPackagePluginValidation \
   -skipMacroValidation \
+  ENABLE_TESTABILITY=YES \
+  ONLY_ACTIVE_ARCH=YES \
   "${FILTER[@]}" > "$LOG" 2>&1
 STATUS=$?
 set -e

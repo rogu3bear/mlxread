@@ -39,6 +39,8 @@ targets:
         products:
           - MLXAudioTTS
           - MLXAudioCore
+      - target: SystemVoiceProvider
+        embed: true
     info:
       path: MLXRead/Resources/Info.plist
       properties:
@@ -52,6 +54,38 @@ targets:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: me.jkca.mlxread
         PRODUCT_NAME: MLXRead
+
+  SystemVoiceProvider:
+    type: app-extension
+    platform: macOS
+    sources:
+      - path: SystemVoiceProvider
+    info:
+      path: SystemVoiceProvider/Info.plist
+      properties:
+        CFBundleDisplayName: MLXRead Voice
+        NSExtension:
+          NSExtensionPointIdentifier: com.apple.AudioUnit
+          NSExtensionPrincipalClass: $(PRODUCT_MODULE_NAME).AudioUnitFactory
+          NSExtensionAttributes:
+            AudioComponents:
+              - description: MLXRead Speech Provider
+                manufacturer: JKCA
+                name: "JKCA: MLXRead Voice"
+                sandboxSafe: true
+                subtype: mlxr
+                tags:
+                  - Synthesizer
+                type: ausp
+                version: 65536
+    entitlements:
+      path: SystemVoiceProvider/SystemVoiceProvider.entitlements
+      properties:
+        com.apple.security.app-sandbox: true
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: me.jkca.mlxread.SystemVoiceProvider
+        SKIP_INSTALL: YES
 
   MLXReadTests:
     type: bundle.unit-test
@@ -89,5 +123,6 @@ schemes:
       gatherCoverageData: false
       targets:
         - MLXReadTests
+        - MLXReadUITests
     archive:
       config: Release

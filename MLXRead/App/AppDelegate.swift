@@ -28,8 +28,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         hud = PlaybackHUDController(appState: appState)
 
-        if !appState.permissions.isTrusted, !appState.settings.onboardingCompleted {
-            showOnboarding()
+        // No transient windows under XCUITest: the test attaches to the
+        // accessibility tree during launch and a window appearing mid-attach
+        // races AppKit's snapshot machinery.
+        let isUITest = ProcessInfo.processInfo.environment["MLXREAD_UITEST"] == "1"
+        if !isUITest, !appState.permissions.isTrusted, !appState.settings.onboardingCompleted {
+            // Deferred: presenting a window inside the launch transaction
+            // collides with MenuBarExtra scene setup — AppKit throws
+            // "_postWindowNeedsUpdateConstraints during display cycle"
+            // and the app aborts. One settled run-loop turn avoids it.
+            Task { @MainActor [weak self] in
+                try? await Task.sleep(for: .milliseconds(400))
+                self?.showOnboarding()
+            }
         }
         AppLogger.app.info("MLXRead launched (mock engine: \(self.appState.usesMockEngine))")
     }
