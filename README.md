@@ -5,6 +5,8 @@ A local, private replacement for macOS "Speak Selection": press **⌥⎋
 text-to-speech model running entirely on your Mac. Press ⌥⎋ again and it
 stops instantly.
 
+**[Download the latest release](https://github.com/rogu3bear/mlxread/releases/latest)** (Developer ID–signed `.app`, macOS 14+ · Apple Silicon) · **Website & demo:** [mlxread-web.pages.dev](https://mlxread-web.pages.dev)
+
 - Menu-bar utility (no Dock icon), SwiftUI + AppKit at the edges
 - Local synthesis via [mlx-audio-swift](https://github.com/Blaizzy/mlx-audio-swift)
   — Kokoro 82M (default, 54 voices) or Soprano 80M (fast, English)
