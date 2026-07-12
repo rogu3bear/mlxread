@@ -4,6 +4,7 @@ struct GeneralSettingsView: View {
     @Environment(AppSettings.self) private var settings
     @Environment(AppState.self) private var appState
     @Environment(AccessibilityPermissionService.self) private var permissions
+    @Environment(UpdateService.self) private var updates
 
     var body: some View {
         @Bindable var settings = settings
@@ -45,6 +46,23 @@ struct GeneralSettingsView: View {
                 Text("Longer selections are truncated at a word boundary and the truncation is reported in the menu.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
+            }
+
+            if updates.isConfigured {
+                Section("Updates") {
+                    Toggle("Automatically check for updates", isOn: Binding(
+                        get: { updates.automaticallyChecksForUpdates },
+                        set: { updates.automaticallyChecksForUpdates = $0 }
+                    ))
+                    HStack {
+                        Button("Check Now") { updates.checkForUpdates() }
+                            .disabled(!updates.canCheckForUpdates)
+                        Spacer()
+                        Text("Updates are cryptographically signed (EdDSA) and verified before install.")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                }
             }
 
             Section {

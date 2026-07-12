@@ -4,3 +4,8 @@ dist/
 xcuserdata/
 .DS_Store
 *.wav
+
+# Sparkle release signing — the private key never belongs in the repo.
+*.pem
+sparkle_private_key*
+Config/Signing.local.xcconfig

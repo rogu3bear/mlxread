@@ -37,6 +37,9 @@ packages:
   MLXAudio:
     url: https://github.com/Blaizzy/mlx-audio-swift
     exactVersion: 0.1.3
+  Sparkle:
+    url: https://github.com/sparkle-project/Sparkle
+    exactVersion: 2.9.4
 
 targets:
   MLXRead:
@@ -49,6 +52,8 @@ targets:
         products:
           - MLXAudioTTS
           - MLXAudioCore
+      - package: Sparkle
+        product: Sparkle
       - target: SystemVoiceProvider
         embed: true
     info:
@@ -60,6 +65,13 @@ targets:
         LSMinimumSystemVersion: "14.0"
         LSApplicationCategoryType: public.app-category.utilities
         NSHumanReadableCopyright: "© 2026 James Auchterlonie. MIT licensed."
+        # Sparkle auto-update. SUFeedURL and SUPublicEDKey are the only two
+        # release-specific values; set them for a published build (see
+        # docs/updates.md). An empty SUFeedURL disables update UI at runtime.
+        SUFeedURL: "https://raw.githubusercontent.com/OWNER/mlxread/main/appcast.xml"
+        SUPublicEDKey: "REPLACE_WITH_generate_keys_PUBLIC_KEY"
+        SUEnableAutomaticChecks: true
+        SUScheduledCheckInterval: 86400
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: me.jkca.mlxread

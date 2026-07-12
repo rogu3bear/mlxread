@@ -11,6 +11,7 @@ struct MLXReadApp: App {
                 .environment(appDelegate.appState.settings)
                 .environment(appDelegate.appState.modelStore)
                 .environment(appDelegate.appState.permissions)
+                .environment(appDelegate.appState.updates)
                 .environment(appDelegate.appState)
         } label: {
             MenuBarIcon()
@@ -23,6 +24,7 @@ struct MLXReadApp: App {
                 .environment(appDelegate.appState.settings)
                 .environment(appDelegate.appState.modelStore)
                 .environment(appDelegate.appState.permissions)
+                .environment(appDelegate.appState.updates)
                 .environment(appDelegate.appState)
         }
     }

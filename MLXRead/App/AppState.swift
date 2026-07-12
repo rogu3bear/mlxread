@@ -77,6 +77,7 @@ final class AppState {
     let permissions: AccessibilityPermissionService
     let modelStore: ModelStore
     let coordinator: SpeechCoordinator
+    let updates: UpdateService
     private(set) var hotkeyInstalled = false
 
     private var hotkey: GlobalHotkeyService?
@@ -92,6 +93,7 @@ final class AppState {
         self.settings = settings
         permissions = AccessibilityPermissionService()
         modelStore = ModelStore()
+        updates = UpdateService()
         usesMockEngine = ProcessInfo.processInfo.environment["MLXREAD_ENGINE"] == "mock"
 
         let selectionService = SelectedTextService(

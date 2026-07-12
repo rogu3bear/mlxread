@@ -27,10 +27,14 @@ script/build_and_run.sh      # build (xcodebuild) + launch
 script/build_and_run.sh --verify   # build, launch, assert process + signature
 ```
 
-Signing uses your local Apple Development certificate (team configurable in
-`project.yml`). No paid account is required to run locally. Plain
-`swift build` is not a supported path — mlx-swift's Metal kernels need the
-Xcode build system.
+Signing uses your local Apple Development certificate. Contributors override
+the team without editing tracked files —
+`DEVELOPMENT_TEAM=YOURTEAM script/build_and_run.sh`, or
+`CODE_SIGNING_ALLOWED=NO script/build_and_run.sh` for a quick unsigned build
+(see [CONTRIBUTING.md](CONTRIBUTING.md)). A stable identity is recommended so
+the Accessibility grant persists across rebuilds. No paid account is required
+to run locally. Plain `swift build` is not a supported path — mlx-swift's
+Metal kernels need the Xcode build system.
 
 ## First launch
 
@@ -38,7 +42,10 @@ Xcode build system.
    window.
 2. Grant **Accessibility** access (System Settings → Privacy & Security →
    Accessibility). This powers both selection reading and the ⌥⎋ event tap.
-   The app polls and picks the permission up without a relaunch.
+   The app monitors trust continuously: it picks up the grant without a
+   relaunch, and if you later **revoke** access it removes its keyboard tap and
+   stops any active reading immediately. Settings → Permissions shows both the
+   permission state and whether the ⌥⎋ shortcut is actually installed.
 3. If Apple's built-in **Speak selection** shortcut is enabled and set to
    ⌥⎋, disable or reassign it under System Settings → Accessibility →
    Spoken Content. MLXRead will not change that setting for you.
@@ -59,6 +66,16 @@ Xcode build system.
 
 Long selections are truncated at a configurable limit (default 20,000
 characters) at a word boundary; truncation is indicated in the menu.
+
+## Updates
+
+MLXRead auto-updates via [Sparkle 2](https://sparkle-project.org) with
+**EdDSA-signed** appcasts over HTTPS — every update is cryptographically
+verified before install. Check manually from the menu bar (**Check for
+Updates…**) or Settings → General; automatic daily checks are on by default.
+Update controls only appear in a build configured with a real feed and public
+key; source/dev builds keep the updater inactive. Maintainer setup and the
+release/signing process: [docs/updates.md](docs/updates.md).
 
 ## Offline behavior
 

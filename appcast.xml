@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  MLXRead update feed (Sparkle appcast).
+
+  This is the release manifest Sparkle fetches from SUFeedURL. Each release
+  adds one <item>. The sparkle:edSignature is produced by `sign_update`
+  (see docs/updates.md) using the maintainer's Ed25519 PRIVATE key, which is
+  never committed. Sparkle verifies it against SUPublicEDKey in Info.plist
+  before installing.
+
+  Replace OWNER with the GitHub owner/org once the repo is published.
+-->
+<rss version="2.0" xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle" xmlns:dc="http://purl.org/dc/elements/1.1/">
+  <channel>
+    <title>MLXRead</title>
+    <link>https://raw.githubusercontent.com/OWNER/mlxread/main/appcast.xml</link>
+    <description>Local, private Option–Escape speak-selection for macOS.</description>
+    <language>en</language>
+    <item>
+      <title>Version 0.1.0</title>
+      <description><![CDATA[
+        <ul>
+          <li>Initial public release: Option–Escape reads the selection aloud with a local MLX model.</li>
+          <li>Kokoro and Soprano voices, streaming playback, clipboard-preserving fallback.</li>
+        </ul>
+      ]]></description>
+      <pubDate>Sat, 11 Jul 2026 00:00:00 -0500</pubDate>
+      <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
+      <sparkle:version>1</sparkle:version>
+      <sparkle:shortVersionString>0.1.0</sparkle:shortVersionString>
+      <enclosure
+        url="https://github.com/OWNER/mlxread/releases/download/v0.1.0/MLXRead-0.1.0.zip"
+        length="0"
+        type="application/octet-stream"
+        sparkle:edSignature="REPLACE_WITH_SIGN_UPDATE_OUTPUT" />
+    </item>
+  </channel>
+</rss>

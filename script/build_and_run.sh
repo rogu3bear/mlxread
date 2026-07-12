@@ -31,6 +31,15 @@ APP="$DERIVED/Build/Products/$CONFIGURATION/MLXRead.app"
 echo "==> Stopping any running MLXRead"
 pkill -x MLXRead 2>/dev/null || true
 
+# Contributors override signing without editing tracked files:
+#   DEVELOPMENT_TEAM=ABCDE12345 script/build_and_run.sh   # your own team
+#   CODE_SIGNING_ALLOWED=NO      script/build_and_run.sh   # quick unsigned build
+# A stable signing identity is recommended: the macOS Accessibility (TCC)
+# grant is keyed to the code signature, so ad-hoc/unsigned rebuilds re-prompt.
+SIGN_OVERRIDE=()
+[[ -n "${DEVELOPMENT_TEAM:-}" ]] && SIGN_OVERRIDE+=("DEVELOPMENT_TEAM=$DEVELOPMENT_TEAM")
+[[ -n "${CODE_SIGNING_ALLOWED:-}" ]] && SIGN_OVERRIDE+=("CODE_SIGNING_ALLOWED=$CODE_SIGNING_ALLOWED")
+
 echo "==> Building ($CONFIGURATION)"
 xcodebuild \
   -project MLXRead.xcodeproj \
@@ -39,6 +48,7 @@ xcodebuild \
   -derivedDataPath "$DERIVED" \
   -skipPackagePluginValidation \
   -skipMacroValidation \
+  ${SIGN_OVERRIDE[@]+"${SIGN_OVERRIDE[@]}"} \
   build
 
 if [[ ! -d "$APP" ]]; then

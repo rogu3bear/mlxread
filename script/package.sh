@@ -10,6 +10,15 @@ DERIVED=build/DerivedData
 CONFIGURATION=Release
 APP="$DERIVED/Build/Products/$CONFIGURATION/MLXRead.app"
 
+# Signing override (see build_and_run.sh). For a PUBLIC release, sign with a
+# Developer ID identity and notarize — Developer ID + hardened runtime strips
+# get-task-allow (TM-001). Example:
+#   DEVELOPMENT_TEAM=ABCDE12345 CODE_SIGN_IDENTITY="Developer ID Application" \
+#     script/package.sh
+SIGN_OVERRIDE=()
+[[ -n "${DEVELOPMENT_TEAM:-}" ]] && SIGN_OVERRIDE+=("DEVELOPMENT_TEAM=$DEVELOPMENT_TEAM")
+[[ -n "${CODE_SIGN_IDENTITY:-}" ]] && SIGN_OVERRIDE+=("CODE_SIGN_IDENTITY=$CODE_SIGN_IDENTITY")
+
 echo "==> Building ($CONFIGURATION)"
 # Remove any stale product first (a prior hosted-test build can leave an
 # xctest bundle inside the app, which breaks release code signing).
@@ -21,6 +30,7 @@ xcodebuild \
   -derivedDataPath "$DERIVED" \
   -skipPackagePluginValidation \
   -skipMacroValidation \
+  ${SIGN_OVERRIDE[@]+"${SIGN_OVERRIDE[@]}"} \
   build
 
 mkdir -p dist

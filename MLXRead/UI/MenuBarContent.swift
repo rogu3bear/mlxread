@@ -5,6 +5,7 @@ struct MenuBarContent: View {
     @Environment(AppSettings.self) private var settings
     @Environment(ModelStore.self) private var modelStore
     @Environment(AccessibilityPermissionService.self) private var permissions
+    @Environment(UpdateService.self) private var updates
     @Environment(AppState.self) private var appState
 
     var body: some View {
@@ -60,6 +61,13 @@ struct MenuBarContent: View {
                 Text("Settings…")
             }
             .keyboardShortcut(",")
+
+            if updates.isConfigured {
+                Button("Check for Updates…") {
+                    updates.checkForUpdates()
+                }
+                .disabled(!updates.canCheckForUpdates)
+            }
 
             Toggle("Launch at Login", isOn: launchAtLoginBinding)
 
