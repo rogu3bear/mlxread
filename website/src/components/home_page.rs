@@ -122,8 +122,8 @@ fn HeroDemo() -> impl IntoView {
                     <a class="btn btn--ghost" href="#how">"See how it works"</a>
                 </div>
                 <p class="hero__foot mono muted">
-                    "Universal · macOS 14+ · Apple Silicon · signed · ~"
-                    <span class="dl-size">"40 MB"</span>
+                    "macOS 14+ · Apple Silicon · signed & notarized · ~"
+                    <span class="dl-size">"26 MB"</span>
                 </p>
             </div>
 
@@ -367,9 +367,9 @@ fn OpenSource() -> impl IntoView {
                             "Download MLXRead.app"
                         </a>
                         <p class="mono muted install__hint">
-                            "Unzip, drag to Applications. First launch: right-click the app → "
-                            <b>"Open"</b>
-                            " (signed, not yet notarized, so Gatekeeper asks once)."
+                            "Unzip, drag to Applications, and open it. "
+                            <b>"Signed and notarized by Apple"</b>
+                            " — no Gatekeeper warning."
                         </p>
                         <div class="terminal">
                             <div class="titlebar">

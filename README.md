@@ -161,9 +161,9 @@ interactive ⌥⎋ demo, deployed to Cloudflare Pages at
   nothing else wrote to it mid-capture (by design).
 - PDF viewers must expose a text layer through Accessibility or respond
   to ⌘C for capture to work.
-- The published `.app` is Developer ID–signed with hardened runtime but not
-  yet notarized, so first launch shows a Gatekeeper prompt (right-click → Open).
-  Run `./script/notarize.sh` once to notarize and remove that prompt.
+- The published `.app` is Developer ID–signed, hardened-runtime, and
+  **notarized by Apple** — it opens without a Gatekeeper prompt. Re-cut a
+  notarized release anytime with `./script/notarize.sh`.
 
 ## Licenses
 
