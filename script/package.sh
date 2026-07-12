@@ -52,6 +52,25 @@ mkdir -p dist
 rm -rf dist/MLXRead.app
 cp -R "$APP" dist/MLXRead.app
 
+# Deep-sign Sparkle's nested helpers for Developer ID / notarization. A plain
+# `xcodebuild build` seals the framework but leaves Updater.app, Autoupdate,
+# and the XPC services signed by Sparkle (no Developer ID, no secure timestamp),
+# which the notary service rejects. Re-sign them inside-out with our identity,
+# then re-seal the framework and the app (the main app carries no entitlements,
+# so get-task-allow stays absent).
+if [[ -n "${CODE_SIGN_IDENTITY:-}" && "$CODE_SIGN_IDENTITY" == *"Developer ID"* ]]; then
+  echo "==> Deep-signing embedded Sparkle helpers"
+  SPARKLE="dist/MLXRead.app/Contents/Frameworks/Sparkle.framework"
+  SPV="$SPARKLE/Versions/B"
+  resign() { codesign --force --options runtime --timestamp --sign "$CODE_SIGN_IDENTITY" "$1"; }
+  [[ -d "$SPV/XPCServices/Downloader.xpc" ]] && resign "$SPV/XPCServices/Downloader.xpc"
+  [[ -d "$SPV/XPCServices/Installer.xpc" ]] && resign "$SPV/XPCServices/Installer.xpc"
+  [[ -e "$SPV/Autoupdate" ]] && resign "$SPV/Autoupdate"
+  [[ -d "$SPV/Updater.app" ]] && resign "$SPV/Updater.app"
+  resign "$SPARKLE"
+  resign "dist/MLXRead.app"
+fi
+
 echo "==> Signing state"
 codesign --verify --deep --strict dist/MLXRead.app
 codesign -dvvv dist/MLXRead.app 2>&1 | grep -E '^(Identifier|Authority|TeamIdentifier|Signature|CodeDirectory)' || true
