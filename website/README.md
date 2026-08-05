@@ -1,76 +1,99 @@
-# MLXRead — website
+# MLXRead website
 
-The marketing + demo site for [MLXRead](../README.md): a beautiful, fast,
-single-page site that shows what MLXRead does and how it functions.
+The public product, first-read, privacy, FAQ, and support experience for
+[MLXRead](../README.md). It is a Leptos 0.8 application with edge SSR,
+progressive router navigation, and one hydrated home-page demo.
 
-Built with **Leptos 0.8 (SSR + hydration) on Cloudflare Workers**, derived from
-the [`leptos-cf`](https://github.com/) starter. The interactive ⌥⎋ demo is real
-Leptos reactivity (an epoch-cancelled state machine that mirrors the app's own
-generation-id guard), server-rendered on the edge and hydrated in the browser.
+## Product routes
 
-## What's here
+- `/` — product promise, interactive read lifecycle, privacy, performance.
+- `/get-started` — canonical download-to-first-read journey.
+- `/faq` and `/support` — recovery, troubleshooting, and contact.
+- `/privacy` and `/terms` — product and website policies.
 
-- `src/app.rs` — router, SSR shell, meta, hashed-asset hydration.
-- `src/components/home_page.rs` — the whole landing page + the interactive demo.
-- `src/components/widgets.rs` — `Keycap`, `OptEsc`, `Waveform`.
-- `src/components/app_layout.rs` — header + footer.
-- `src/lib.rs` — the hardened Cloudflare Worker `fetch` handler (CSP with a
-  hashed hydration script, security headers, session cookie, same-origin
-  guards). Kept from the template; the D1 data layer and server functions were
-  removed because the site has no backend.
-- `style/main.css` — the terminal-native dark design system (amber = audio,
-  green = privacy/verified, mono for keys and technical labels).
+Route changes use Leptos Router. Content and the support form remain usable
+without JavaScript. Unknown routes return an HTTP 404 rather than only drawing
+a not-found view.
+
+## Runtime
+
+- `src/app.rs` owns the SSR shell, router, metadata context, and route list.
+- `src/components/app_layout.rs` owns shared route-aware navigation.
+- `src/components/get_started_page.rs` owns the first-read journey.
+- `src/lib.rs` owns the Cloudflare fetch handler, route response headers,
+  security policy, same-origin API guards, and payload limits.
+- `scripts/write-worker-shim.mjs` generates the Workers entrypoint that serves
+  hashed assets, proxies the same-origin contact form, and delegates documents
+  to Leptos SSR.
+- `scripts/pages-worker-entry.js` provides the equivalent wrapper for the
+  Cloudflare Pages advanced-mode package.
+
+There is no database, account state, realtime transport, or analytics layer.
 
 ## Develop
 
+Install or verify the pinned toolchain, then run Leptos locally:
+
 ```bash
-cargo leptos watch        # http://127.0.0.1:57591 with live reload
+bash ./scripts/bootstrap.sh
+cargo leptos watch
 ```
 
-## Build (edge bundle)
+The Leptos development server listens at `http://127.0.0.1:57591`.
+
+## Verify
+
+```bash
+bash ./scripts/verify.sh
+```
+
+The release gate runs formatting, SSR compilation, the complete WASM and edge
+build, asset/runtime contract checks, and a Wrangler deployment dry-run.
+
+## Build and preview
+
+Workers Assets bundle:
 
 ```bash
 bash ./scripts/build-edge.sh
+bunx wrangler@4.83.0 dev --local --ip 127.0.0.1 --port 57581
 ```
 
-This runs `cargo leptos build --release`, hashes the JS/WASM/CSS assets,
-compiles the SSR worker with `worker-build`, writes `build/_worker.js`, and
-verifies the hashed-asset and worker-runtime invariants. Output:
+Pages advanced-mode package:
 
-- `target/site/` — static assets served by Workers Assets (`env.ASSETS`).
-- `build/_worker.js` — the Worker entrypoint.
+```bash
+bash ./scripts/build-pages.sh
+bunx wrangler@4.83.0 pages dev dist-pages
+```
 
-Requires the pinned toolchain: `cargo-leptos 0.3.5`, `worker-build 0.7.5`,
-`wasm-bindgen 0.2.108`, Bun.
+The build hashes browser JS, WASM, and CSS. Hashed assets are immutable; SSR
+documents require revalidation; API rejection responses are private and
+`no-store`. The Worker compatibility date is pinned to `2026-04-22`, the latest
+date supported by the repository-pinned Wrangler 4.83.0 runtime.
 
 ## Deploy
 
-**Live:** https://mlxread-web.pages.dev (Cloudflare Pages).
+The compatibility production endpoint is
+[`mlxread-web.pages.dev`](https://mlxread-web.pages.dev). The canonical product
+domain is `https://mlxread.com`; it is not considered released until DNS, TLS,
+routes, status codes, content, and response headers pass live readback.
 
-The site deploys to **Cloudflare Pages** in advanced mode. Because Pages
-requires a Module-syntax worker (`export default { fetch }`) and does not serve
-static assets automatically, `scripts/build-pages.sh` wraps the worker-build
-output in a thin module worker (`scripts/pages-worker-entry.js`) that serves
-assets via `env.ASSETS` and delegates everything else to the Leptos SSR worker.
+Pages deployment:
 
 ```bash
-bash ./scripts/build-pages.sh                 # -> dist-pages/ (assets + _worker.js/)
-bunx wrangler@4.83.0 pages dev dist-pages      # local preview on the Pages runtime
+bash ./scripts/build-pages.sh
 bunx wrangler@4.83.0 pages deploy dist-pages \
-  --project-name mlxread-web --branch main     # deploy (main = production)
+  --project-name mlxread-web --branch main
 ```
 
-Project created once with:
-`wrangler pages project create mlxread-web --production-branch main --compatibility-date 2026-04-22`
-(the compatibility date must support `WorkerEntrypoint`).
-
-`wrangler.toml` (the `main` + `[assets]` Workers config) is kept for
-`cargo leptos` / `build-edge.sh` and local `wrangler dev`; the Pages path uses
-`dist-pages/` instead. There is no D1 / data layer.
+Workers deployment uses `wrangler.toml` and the `build/_worker.js` entrypoint.
+Cloudflare mutations must use the repository's purpose-scoped child token and
+the operator's governed deployment lane; the account minter never enters this
+repository or CI.
 
 ## Design intent
 
-Terminal-native, system-utility precision. The waveform is the product's real
-output motif (it animates only while "speaking"), the keyboard chord ⌥⎋ is a
-first-class UI element, and the copy is grounded in the app's actual behavior
-and measured numbers — no invented claims.
+The surface uses the product's waveform, keyboard chord, dark graphite field,
+and warm amber action color. Copy is grounded in observed application behavior
+and measured numbers. The first-read route favors explicit prerequisites and
+recovery over simulated macOS UI or invented claims.

@@ -1,5 +1,6 @@
 use leptos::prelude::*;
-use leptos_meta::{provide_meta_context, Meta, MetaTags, Title};
+use leptos_meta::{provide_meta_context, Meta, MetaTags};
+use leptos_router::components::A;
 use leptos_router::{
     components::{Route, Router, Routes},
     SsrMode, StaticSegment, WildcardSegment,
@@ -7,8 +8,10 @@ use leptos_router::{
 
 use crate::components::app_layout::AppLayout;
 use crate::components::faq_page::FaqPage;
+use crate::components::get_started_page::GetStartedPage;
 use crate::components::home_page::HomePage;
 use crate::components::legal_page::{PrivacyPage, TermsPage};
+use crate::components::page_meta::PageMeta;
 use crate::components::support_page::SupportPage;
 
 #[allow(dead_code)]
@@ -40,23 +43,13 @@ pub fn App() -> impl IntoView {
     provide_meta_context();
 
     view! {
-        <Title text="MLXRead — local, private speak-selection for macOS"/>
-        <Meta
-            name="description"
-            content="Press Option-Escape in any Mac app to hear the selection read aloud by a local MLX text-to-speech model. Nothing leaves your Mac. Open source."
-        />
         <Meta name="color-scheme" content="dark"/>
-        <Meta property="og:title" content="MLXRead"/>
-        <Meta
-            property="og:description"
-            content="Option-Escape reads your selection aloud with a local model. On-device, private, open source."
-        />
-        <Meta property="og:type" content="website"/>
 
         <Router>
             <AppLayout>
                 <Routes fallback=|| view! { <NotFoundPage/> }.into_view()>
                     <Route path=StaticSegment("") view=HomePage ssr=SsrMode::OutOfOrder/>
+                    <Route path=StaticSegment("get-started") view=GetStartedPage ssr=SsrMode::OutOfOrder/>
                     <Route path=StaticSegment("privacy") view=PrivacyPage ssr=SsrMode::OutOfOrder/>
                     <Route path=StaticSegment("terms") view=TermsPage ssr=SsrMode::OutOfOrder/>
                     <Route path=StaticSegment("faq") view=FaqPage ssr=SsrMode::OutOfOrder/>
@@ -72,12 +65,22 @@ pub fn App() -> impl IntoView {
 
 #[component]
 fn NotFoundPage() -> impl IntoView {
+    #[cfg(feature = "ssr")]
+    if let Some(response) = use_context::<leptos_axum::ResponseOptions>() {
+        response.set_status(axum::http::StatusCode::NOT_FOUND);
+    }
+
     view! {
+        <PageMeta
+            title="Page not found — MLXRead"
+            description="The requested MLXRead page does not exist."
+            path="/404"
+        />
         <main class="shell">
             <section class="notfound">
                 <p class="mono muted">"404"</p>
                 <h1>"That page is not here."</h1>
-                <a class="btn btn--primary" href="/">"Back to MLXRead"</a>
+                <A href="/" attr:class="btn btn--primary">"Back to MLXRead"</A>
             </section>
         </main>
     }

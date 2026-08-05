@@ -1,7 +1,9 @@
 use leptos::prelude::*;
+use leptos_router::components::A;
 use leptos_router::hooks::use_query_map;
 
 use crate::components::home_page::REPO_URL;
+use crate::components::page_meta::PageMeta;
 
 const ISSUES_URL: &str = "https://github.com/rogu3bear/mlxread/issues";
 
@@ -23,13 +25,18 @@ pub fn SupportPage() -> impl IntoView {
     let errored = move || status() == "error";
 
     view! {
+        <PageMeta
+            title="MLXRead support"
+            description="Troubleshoot MLXRead permissions, models, audio, downloads, and first-read setup, or contact the maintainer."
+            path="/support"
+        />
         <main class="shell">
             <article class="support band">
                 <p class="eyebrow">"Support"</p>
                 <h1>"Get it working — or get in touch."</h1>
                 <p class="legal__lede">
                     "Most issues are one setting away. Start with the quick fixes and the "
-                    <a href="/faq">"FAQ"</a>
+                    <A href="/faq">"FAQ"</A>
                     "; if you're still stuck, send a message and it comes straight to the maintainer."
                 </p>
 
@@ -63,7 +70,7 @@ pub fn SupportPage() -> impl IntoView {
                     <h2>"More help"</h2>
                     <ul class="support__links">
                         <li>
-                            <a href="/faq">"FAQ"</a>
+                            <A href="/faq">"FAQ"</A>
                             " — the common questions, answered in detail."
                         </li>
                         <li>
@@ -170,7 +177,7 @@ pub fn SupportPage() -> impl IntoView {
                     </form>
                 </section>
 
-                <a class="btn btn--ghost legal__back" href="/">"← Back to MLXRead"</a>
+                <A href="/" attr:class="btn btn--ghost legal__back">"← Back to MLXRead"</A>
             </article>
         </main>
     }

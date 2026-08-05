@@ -197,6 +197,15 @@ button {
   color: var(--ink);
   background: var(--bg-2);
 }
+.nav__link[aria-current="page"] {
+  color: var(--ink);
+  background: var(--bg-2);
+}
+.nav__link--cta[aria-current="page"] {
+  color: var(--amber);
+  border-color: var(--amber);
+  background: var(--amber-soft);
+}
 .nav__link--cta {
   color: var(--amber);
   border: 1px solid var(--line-2);
@@ -852,6 +861,89 @@ button {
   font-size: clamp(1.8rem, 4vw, 2.6rem);
 }
 
+/* ---- First-read journey ---- */
+.start {
+  max-width: 920px;
+}
+.start__hero {
+  max-width: 720px;
+  padding-bottom: 64px;
+}
+.start__hero h1 {
+  margin-top: 8px;
+  font-size: clamp(2.35rem, 5vw, 4rem);
+  max-width: 14ch;
+}
+.start__section {
+  padding: 56px 0;
+  border-top: 1px solid var(--line);
+}
+.start__section > h2,
+.start__recovery h2 {
+  font-size: clamp(1.65rem, 3vw, 2.3rem);
+  margin-bottom: 28px;
+}
+.requirements {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+}
+.requirement {
+  display: grid;
+  gap: 8px;
+  padding: 20px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm);
+  background: var(--bg-1);
+}
+.requirement__label {
+  font-size: 0.76rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+.start-steps {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+}
+.start-step {
+  display: grid;
+  grid-template-columns: 52px 1fr;
+  gap: 20px;
+  padding: 28px 0;
+  border-bottom: 1px solid var(--line);
+}
+.start-step:first-child {
+  border-top: 1px solid var(--line);
+}
+.start-step__number {
+  color: var(--amber);
+  font-size: 0.84rem;
+  padding-top: 4px;
+}
+.start-step h3 {
+  font-size: 1.16rem;
+  margin-bottom: 8px;
+}
+.start-step p {
+  color: var(--ink-2);
+  max-width: 68ch;
+}
+.start__recovery {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: end;
+  gap: 36px;
+}
+.start__recovery h2 {
+  margin: 8px 0 0;
+}
+.start__recovery-actions {
+  display: grid;
+  gap: 10px;
+}
+
 /* ---- FAQ ---- */
 .faq {
   max-width: 820px;
@@ -1221,6 +1313,14 @@ select.field__input {
   .support__grid {
     grid-template-columns: 1fr;
   }
+  .start__recovery {
+    grid-template-columns: 1fr;
+    align-items: start;
+  }
+  .start__recovery-actions {
+    display: flex;
+    flex-wrap: wrap;
+  }
   .band {
     padding: 68px 20px;
   }
@@ -1234,6 +1334,13 @@ select.field__input {
   }
   .contact__row {
     grid-template-columns: 1fr;
+  }
+  .requirements {
+    grid-template-columns: 1fr;
+  }
+  .start-step {
+    grid-template-columns: 36px 1fr;
+    gap: 12px;
   }
 }
 

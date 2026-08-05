@@ -1,49 +1,49 @@
 use leptos::prelude::*;
+use leptos_router::components::A;
 
 use crate::components::home_page::REPO_URL;
 
 const AUTHOR_URL: &str = "https://jkca.me";
 const AUTHOR_GITHUB: &str = "https://github.com/rogu3bear";
 
-/// Persistent header + footer wrapped around every page. Participates in SSR
-/// and hydration. Home-section links use `/#anchor` so they work from any
-/// route (e.g. the /privacy and /terms pages).
+/// Persistent, progressively enhanced navigation for every route. Route
+/// changes use Leptos Router; same-document section jumps remain native links.
 #[component]
 pub fn AppLayout(children: Children) -> impl IntoView {
     view! {
-        <a class="skip-link" href="#how">"Skip to content"</a>
+        <a class="skip-link" href="#main-content">"Skip to content"</a>
         <header class="topbar">
             <div class="topbar__inner">
-                <a class="brand" href="/">
+                <A href="/" exact=true attr:class="brand">
                     <img class="brand__mark" src="/app-icon.svg" alt="" width="26" height="26"/>
                     <span class="brand__name">"MLXRead"</span>
-                </a>
-                <nav class="nav">
+                </A>
+                <nav class="nav" aria-label="Primary navigation">
                     <a class="nav__link" href="/#how">"How it works"</a>
-                    <a class="nav__link" href="/#privacy">"Privacy"</a>
-                    <a class="nav__link" href="/faq">"FAQ"</a>
-                    <a class="nav__link" href="/support">"Support"</a>
-                    <a class="nav__link nav__link--cta" href="/#install">"Download"</a>
+                    <A href="/privacy" attr:class="nav__link">"Privacy"</A>
+                    <A href="/faq" attr:class="nav__link">"FAQ"</A>
+                    <A href="/support" attr:class="nav__link">"Support"</A>
+                    <A href="/get-started" attr:class="nav__link nav__link--cta">"Get started"</A>
                 </nav>
             </div>
         </header>
 
-        {children()}
+        <div id="main-content" tabindex="-1">{children()}</div>
 
         <footer class="footer">
             <div class="footer__inner">
                 <div class="footer__top">
-                    <a class="footer__brand" href="/">
+                    <A href="/" exact=true attr:class="footer__brand">
                         <img class="brand__mark" src="/app-icon.svg" alt="" width="22" height="22"/>
                         <span class="mono">"MLXRead"</span>
-                    </a>
-                    <nav class="footer__links">
-                        <a href="/#install">"Download"</a>
-                        <a href="/faq">"FAQ"</a>
-                        <a href="/support">"Support"</a>
+                    </A>
+                    <nav class="footer__links" aria-label="Footer navigation">
+                        <A href="/get-started">"Get started"</A>
+                        <A href="/faq">"FAQ"</A>
+                        <A href="/support">"Support"</A>
                         <a href=REPO_URL rel="noopener" target="_blank">"Source"</a>
-                        <a href="/privacy">"Privacy"</a>
-                        <a href="/terms">"Terms"</a>
+                        <A href="/privacy">"Privacy"</A>
+                        <A href="/terms">"Terms"</A>
                     </nav>
                 </div>
                 <p class="footer__note muted">

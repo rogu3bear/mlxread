@@ -5,6 +5,8 @@ import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 
 const root = process.cwd();
+// Wrangler 4.83.0's bundled workerd supports compatibility dates through this
+// value. Keep the date pinned with the CLI so local proof matches deployment.
 const expectedCompatibilityDate = process.env.EXPECTED_COMPATIBILITY_DATE ?? "2026-04-22";
 const wrangler = await readFile(join(root, "wrangler.toml"), "utf8");
 const shimPath = join(root, "build/_worker.js");
@@ -32,12 +34,9 @@ if (!existsSync(shimPath)) {
 const shim = await readFile(shimPath, "utf8");
 requireSnippet("build/_worker.js", shim, 'import LeptosWorker from "./index.js";');
 requireSnippet("build/_worker.js", shim, "export default class extends LeptosWorker");
-requireSnippet("build/_worker.js", shim, 'const REALTIME_SOCKET_PATH = "/realtime/socket";');
-requireSnippet("build/_worker.js", shim, "function isWebSocketUpgrade(request)");
-requireSnippet("build/_worker.js", shim, "function handleRealtimeSocket()");
-requireSnippet("build/_worker.js", shim, "new WebSocketPair()");
-requireSnippet("build/_worker.js", shim, "Template endpoint only. Use Durable Objects");
-requireSnippet("build/_worker.js", shim, "status: 426");
+requireSnippet("build/_worker.js", shim, 'const API_BASE = "https://mlxread-api.sp5qybrsvz.workers.dev";');
+requireSnippet("build/_worker.js", shim, "async function handleContact(request)");
+requireSnippet("build/_worker.js", shim, 'url.pathname === "/api/contact"');
 requireSnippet("build/_worker.js", shim, '"/pkg/"');
 requireSnippet("build/_worker.js", shim, '"/asset-manifest.json"');
 requireSnippet("build/_worker.js", shim, '"/app-icon.svg"');
@@ -48,4 +47,8 @@ requireSnippet("build/_worker.js", shim, '"/site.webmanifest"');
 requireSnippet("build/_worker.js", shim, "this.env.ASSETS.fetch(request)");
 requireSnippet("build/_worker.js", shim, "super.fetch(request)");
 
-console.log("[verify-worker-runtime] Worker shim, compatibility date, Assets binding, WebSocket lane, and SSR fallback are aligned");
+if (shim.includes("WebSocketPair") || shim.includes("/realtime/socket")) {
+  throw new Error("build/_worker.js still contains the removed template WebSocket lane");
+}
+
+console.log("[verify-worker-runtime] Worker shim, compatibility date, Assets binding, contact proxy, and SSR fallback are aligned");
