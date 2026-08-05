@@ -82,9 +82,7 @@ cat <<'EOF'
 Bootstrap complete.
 
 Next steps:
-1. bunx wrangler@4.83.0 d1 create leptos-cf-db
-2. Replace the placeholder database IDs in wrangler.toml
-3. bunx wrangler@4.83.0 d1 migrations apply leptos-cf-db --local
-4. bash ./scripts/build-edge.sh
-5. bunx wrangler@4.83.0 dev --local --ip 127.0.0.1 --port 57581
+1. bash ./scripts/build-edge.sh
+2. bunx wrangler@4.83.0 dev --local --ip 127.0.0.1 --port 57581
+3. bash ./scripts/build-pages.sh
 EOF

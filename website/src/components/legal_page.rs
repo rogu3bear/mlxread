@@ -1,11 +1,18 @@
 use leptos::prelude::*;
+use leptos_router::components::A;
 
 use crate::components::home_page::REPO_URL;
+use crate::components::page_meta::PageMeta;
 
 /// Privacy policy. MLXRead collects nothing; this page states that plainly.
 #[component]
 pub fn PrivacyPage() -> impl IntoView {
     view! {
+        <PageMeta
+            title="MLXRead privacy policy"
+            description="MLXRead synthesizes selected text locally, stores no reading content, and includes no accounts, analytics, or trackers."
+            path="/privacy"
+        />
         <main class="shell">
             <article class="legal band">
                 <p class="eyebrow">"Privacy Policy"</p>
@@ -54,7 +61,7 @@ pub fn PrivacyPage() -> impl IntoView {
                     </Item>
                 </Section>
 
-                <a class="btn btn--ghost legal__back" href="/">"← Back to MLXRead"</a>
+                <A href="/" attr:class="btn btn--ghost legal__back">"← Back to MLXRead"</A>
             </article>
         </main>
     }
@@ -64,6 +71,11 @@ pub fn PrivacyPage() -> impl IntoView {
 #[component]
 pub fn TermsPage() -> impl IntoView {
     view! {
+        <PageMeta
+            title="MLXRead terms of use"
+            description="Terms for using the free, MIT-licensed MLXRead macOS application."
+            path="/terms"
+        />
         <main class="shell">
             <article class="legal band">
                 <p class="eyebrow">"Terms of Use"</p>
@@ -101,7 +113,7 @@ pub fn TermsPage() -> impl IntoView {
                     </Item>
                 </Section>
 
-                <a class="btn btn--ghost legal__back" href="/">"← Back to MLXRead"</a>
+                <A href="/" attr:class="btn btn--ghost legal__back">"← Back to MLXRead"</A>
             </article>
         </main>
     }

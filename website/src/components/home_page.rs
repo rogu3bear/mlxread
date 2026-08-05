@@ -1,7 +1,9 @@
 use std::time::Duration;
 
 use leptos::prelude::*;
+use leptos_router::components::A;
 
+use crate::components::page_meta::PageMeta;
 use crate::components::widgets::{OptEsc, Waveform};
 
 /// Source home and the signed-release download. Update the slug in one place.
@@ -41,6 +43,11 @@ impl Phase {
 #[component]
 pub fn HomePage() -> impl IntoView {
     view! {
+        <PageMeta
+            title="MLXRead — local, private speak selection for macOS"
+            description="Press Option-Escape in any Mac app to hear selected text read aloud by a local MLX model. Nothing leaves your Mac."
+            path="/"
+        />
         <main class="shell">
             <HeroDemo/>
             <HowItWorks/>
@@ -116,9 +123,7 @@ fn HeroDemo() -> impl IntoView {
                     ", and hear it in about a second. Nothing is uploaded. Nothing is logged."
                 </p>
                 <div class="hero__actions">
-                    <a class="btn btn--primary" href=DOWNLOAD_URL rel="noopener">
-                        "Download for macOS"
-                    </a>
+                    <A href="/get-started" attr:class="btn btn--primary">"Get started"</A>
                     <a class="btn btn--ghost" href="#how">"See how it works"</a>
                 </div>
                 <p class="hero__foot mono muted">
@@ -363,9 +368,7 @@ fn OpenSource() -> impl IntoView {
 
                 <div class="install">
                     <div class="install__get">
-                        <a class="btn btn--primary" href=DOWNLOAD_URL rel="noopener">
-                            "Download MLXRead.app"
-                        </a>
+                        <A href="/get-started" attr:class="btn btn--primary">"Install MLXRead"</A>
                         <p class="mono muted install__hint">
                             "Unzip, drag to Applications, and open it. "
                             <b>"Signed and notarized by Apple"</b>
@@ -421,7 +424,7 @@ fn ClosingCta() -> impl IntoView {
         <section class="cta">
             <h2>"Stop reading with your eyes when you don't have to."</h2>
             <p class="band__sub">"Select. "<OptEsc/>". Listen. Entirely on your Mac."</p>
-            <a class="btn btn--primary" href="#install">"Build MLXRead"</a>
+            <A href="/get-started" attr:class="btn btn--primary">"Hear your first selection"</A>
         </section>
     }
 }

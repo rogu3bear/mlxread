@@ -1,6 +1,8 @@
 use leptos::prelude::*;
+use leptos_router::components::A;
 
 use crate::components::home_page::REPO_URL;
+use crate::components::page_meta::PageMeta;
 
 /// Frequently asked questions. Answers are grounded in the real app behavior
 /// (see README / docs), not marketing. Uses native <details> for a zero-JS,
@@ -8,6 +10,11 @@ use crate::components::home_page::REPO_URL;
 #[component]
 pub fn FaqPage() -> impl IntoView {
     view! {
+        <PageMeta
+            title="MLXRead FAQ"
+            description="Answers about MLXRead privacy, voices, Accessibility permission, supported Macs, updates, and troubleshooting."
+            path="/faq"
+        />
         <main class="shell">
             <article class="faq band">
                 <p class="eyebrow">"FAQ"</p>
@@ -24,7 +31,7 @@ pub fn FaqPage() -> impl IntoView {
                             ". The logs record lengths and timings only — never content. There are no analytics, no crash SDK, and no account."
                         </p>
                         <p class="faq__link">
-                            <a href="/privacy">"Read the full privacy policy →"</a>
+                            <A href="/privacy">"Read the full privacy policy →"</A>
                         </p>
                     </Faq>
 
@@ -111,7 +118,7 @@ pub fn FaqPage() -> impl IntoView {
                             " inside the app — it attaches a privacy-safe debug bundle (never your text). You can also open an issue on "
                             <a href=REPO_URL rel="noopener" target="_blank">"GitHub"</a>
                             " or use the form on the "
-                            <a href="/support">"Support"</a>
+                            <A href="/support">"Support"</A>
                             " page."
                         </p>
                     </Faq>
@@ -134,11 +141,11 @@ pub fn FaqPage() -> impl IntoView {
                 <div class="faq__more">
                     <p>
                         "Didn't find it? "
-                        <a class="accent" href="/support">"Get support or send a message →"</a>
+                        <A href="/support" attr:class="accent">"Get support or send a message →"</A>
                     </p>
                 </div>
 
-                <a class="btn btn--ghost legal__back" href="/">"← Back to MLXRead"</a>
+                <A href="/" attr:class="btn btn--ghost legal__back">"← Back to MLXRead"</A>
             </article>
         </main>
     }

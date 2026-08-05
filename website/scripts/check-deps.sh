@@ -97,10 +97,6 @@ else
   fail "Rust wasm target missing. Run: rustup target add wasm32-unknown-unknown"
 fi
 
-if grep -q '00000000-0000-0000-0000-000000000000' "$ROOT_DIR/wrangler.toml"; then
-  warn "wrangler.toml still contains placeholder D1 IDs. Replace them after running: bunx wrangler@4.83.0 d1 create leptos-cf-db"
-fi
-
 if [ "$missing" -ne 0 ]; then
   exit 1
 fi

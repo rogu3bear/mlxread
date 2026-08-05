@@ -36,7 +36,11 @@ async fn fetch(
             .status(rejection.status)
             .body(Body::from(rejection.message))
             .map_err(|error| worker::Error::RustError(error.to_string()))?;
-        apply_response_headers(&mut response, &content_security_policy)?;
+        apply_response_headers(
+            &mut response,
+            &content_security_policy,
+            CachePolicy::Private,
+        )?;
         return Ok(response);
     }
 
@@ -45,7 +49,11 @@ async fn fetch(
             .status(StatusCode::PAYLOAD_TOO_LARGE)
             .body(Body::from("Request payload exceeds the demo limit."))
             .map_err(|error| worker::Error::RustError(error.to_string()))?;
-        apply_response_headers(&mut response, &content_security_policy)?;
+        apply_response_headers(
+            &mut response,
+            &content_security_policy,
+            CachePolicy::Private,
+        )?;
         return Ok(response);
     }
 
@@ -62,7 +70,11 @@ async fn fetch(
         .with_state(state);
 
     let mut response = router.call(req).await?;
-    apply_response_headers(&mut response, &content_security_policy)?;
+    apply_response_headers(
+        &mut response,
+        &content_security_policy,
+        CachePolicy::Revalidate,
+    )?;
 
     Ok(response)
 }
@@ -153,13 +165,14 @@ fn request_origin(req: &worker::HttpRequest) -> Option<String> {
 fn apply_response_headers(
     response: &mut axum::http::Response<axum::body::Body>,
     content_security_policy: &axum::http::header::HeaderValue,
+    cache_policy: CachePolicy,
 ) -> worker::Result<()> {
     use axum::http::header::{HeaderValue, CACHE_CONTROL, REFERRER_POLICY, X_CONTENT_TYPE_OPTIONS};
     use axum::http::HeaderName;
 
     // No Set-Cookie: this site is stateless and sets no cookies (see /privacy).
     let headers = response.headers_mut();
-    headers.insert(CACHE_CONTROL, HeaderValue::from_static("no-store"));
+    headers.insert(CACHE_CONTROL, cache_policy.header_value());
     headers.insert(X_CONTENT_TYPE_OPTIONS, HeaderValue::from_static("nosniff"));
     headers.insert(
         REFERRER_POLICY,
@@ -178,6 +191,25 @@ fn apply_response_headers(
 }
 
 #[cfg(feature = "ssr")]
+#[derive(Clone, Copy)]
+enum CachePolicy {
+    Private,
+    Revalidate,
+}
+
+#[cfg(feature = "ssr")]
+impl CachePolicy {
+    fn header_value(self) -> axum::http::header::HeaderValue {
+        use axum::http::header::HeaderValue;
+
+        match self {
+            Self::Private => HeaderValue::from_static("no-store"),
+            Self::Revalidate => HeaderValue::from_static("public, max-age=0, must-revalidate"),
+        }
+    }
+}
+
+#[cfg(feature = "ssr")]
 fn content_security_policy(
     options: &leptos::prelude::LeptosOptions,
 ) -> worker::Result<axum::http::header::HeaderValue> {
@@ -188,7 +220,7 @@ fn content_security_policy(
         format!("'self' 'sha256-{hash}' 'wasm-unsafe-eval'")
     };
     let value = format!(
-        "default-src 'self'; base-uri 'none'; object-src 'none'; frame-ancestors 'none'; form-action 'self'; img-src 'self' data:; connect-src 'self' ws: wss:; style-src 'self' 'unsafe-inline'; script-src {script_sources};"
+        "default-src 'self'; base-uri 'none'; object-src 'none'; frame-ancestors 'none'; form-action 'self'; img-src 'self' data:; connect-src 'self'; style-src 'self' 'unsafe-inline'; script-src {script_sources};"
     );
     axum::http::header::HeaderValue::from_str(&value)
         .map_err(|error| worker::Error::RustError(error.to_string()))
