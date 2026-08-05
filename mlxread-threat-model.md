@@ -1,199 +1,271 @@
-# MLXRead — Threat Model
+# MLXRead Threat Model
 
-_Repo: `~/dev/mlxread` (branch: main). Prepared for AppSec review. Context confirmed with owner: **public distribution**, **high-sensitivity captured text**, scope = **runtime app + build/release pipeline**._
+_Repository: `mlxread`; owner-confirmed assumptions refreshed 2026-08-05._
 
-> **Update (post-review remediation).** Several findings below have shipped mitigations: **TM-001 — resolved:** the public release is signed with a **Developer ID** identity + Hardened Runtime and built with `CODE_SIGN_INJECT_BASE_ENTITLEMENTS=NO`, so `get-task-allow` is **absent** from the shipped app (verified with `codesign -d --entitlements`), closing the task-port memory-scrape vector; MLX synthesis was confirmed working under this stricter runtime. **TM-002** — a Sparkle 2 auto-updater with **EdDSA-signed appcasts over HTTPS** now provides update integrity (`MLXRead/Updates/UpdateService.swift`, `docs/updates.md`); and the Accessibility trust grant now has **continuous revocation monitoring** that tears down the event tap the moment trust is removed (`AccessibilityPermissionService.swift`). Rows are annotated **[mitigated]** / **[partially mitigated]** accordingly; residual work is noted inline.
+## 1. Executive summary
 
-## Executive summary
+MLXRead has one crown-jewel privacy invariant: selected and spoken text must
+stay on the user's Mac. The app nevertheless has legitimate network paths for
+model/pronunciation assets, configured updates, user-initiated problem reports,
+and the public website's support form. Security depends on keeping reading
+content structurally separate from those paths.
 
-MLXRead is a local, offline macOS menu-bar app that reads the user's current selection aloud with an on-device MLX TTS model. Its security story is unusually good on the *data* axis — selected text stays in memory, is never persisted, and is logged only as counts — but that strength is undercut by two things that matter specifically for **public distribution**: (1) the shipped `.app` is **not sandboxed, has hardened runtime disabled, and carries `get-task-allow=true`**, so any local process can read the memory of a program that both holds a global keyboard tap and buffers high-sensitivity text; and (2) model assets are fetched from mutable Hugging Face `main` refs **with no hash or signature verification**, making the model-acquisition path the app's main integrity/supply-chain exposure. The highest-value review targets are the entitlements/signing configuration (`project.yml`), the model download/validation path (`MLXRead/Models/ModelStore.swift`), the global event tap (`MLXRead/Hotkey/GlobalHotkeyService.swift`), and the clipboard-capture fallback (`MLXRead/Accessibility/ClipboardSelectionReader.swift`). There are **no remote listeners, no subprocess execution, and no dynamic code eval** in first-party code, which keeps classic RCE/injection surface near zero.
+The highest-value residual risks are:
 
-## Scope and assumptions
+1. a logging or report-bundle regression that copies reading content into a
+   networked payload;
+2. disclosure or indefinite retention of a diagnostic ZIP whose random
+   download URL acts as its only authorization;
+3. model and pronunciation assets accepted from mutable upstream state without
+   a shipped digest manifest;
+4. release/update misconfiguration or build-host compromise; and
+5. abuse of unauthenticated support/report endpoints whose throttles are
+   intentionally best-effort.
 
-**In scope (runtime):**
-- `MLXRead/` app target — hotkey, selection capture, speech pipeline, model store, UI, app lifecycle.
-- `SystemVoiceProvider/` — the `ausp` speech-synthesis-provider app extension.
-- Model-acquisition path via `swift-huggingface` (behavioral trust boundary, not the dependency's own code).
+The checked local `dist/MLXRead.app` is Developer ID-signed, hardened,
+notarized, and stapled. The public GitHub v0.1.0 release also has a downloadable
+ZIP with a published SHA-256 digest. Those facts are artifact/distribution
+evidence, not proof that the checked-in Sparkle update channel is active: the
+repository's `SUFeedURL`, public key, and `appcast.xml` remain placeholders, and
+`UpdateService` deliberately stays inactive in that state.
 
-**In scope (build/release):**
-- `project.yml` (xcodegen), `MLXRead.xcodeproj/.../Package.resolved`, `script/*.sh`, SPM dependency resolution and macro/plugin execution.
+## 2. Scope and assumptions
 
-**Out of scope:**
-- Internal implementation of third-party packages (mlx-swift, mlx-audio-swift, swift-huggingface, swift-transformers) beyond the trust boundary they present. Pins recorded in `docs/technical-decisions.md`.
-- The security of Hugging Face and Apple infrastructure themselves.
-- The MLX model weights' inference correctness / output quality (not a security property here).
+### In scope
 
-**Explicit assumptions:**
-- A1. Distributed publicly as a signed `.app` (today: Apple **Development**-signed, non-notarized per `script/package.sh`; a public release would move to Developer ID + notarization).
-- A2. Captured selections and clipboard snapshots may contain secrets, legal, or financial content (owner-confirmed "high").
-- A3. macOS 14+ on Apple Silicon; the app runs with the invoking user's privileges and (once granted) Accessibility trust.
-- A4. The primary adversary is a **local, unprivileged process** on the same machine and a **network/supply-chain adversary** on the model-download path — not a remote attacker against a listening port (there is none).
-- A5. Users grant Accessibility because the app cannot function without it; this is a deliberate, high-value trust grant.
+- The macOS app: event tap, Accessibility selection capture, clipboard
+  fallback, in-memory speech pipeline, model cache, diagnostics, and reporting.
+- The public, unauthenticated Leptos website intended for `mlxread.com`, its
+  same-origin server-function surface, and the temporary Pages compatibility
+  hostname.
+- The public delivery Worker: `/contact`, `/report`, `/d/:id`, `/health`, KV
+  rate limits, Email Routing binding, and R2 report storage.
+- Developer ID signing, notarization, Sparkle, the appcast, release publishing,
+  SPM dependencies, build plugins/macros, and model/G2P acquisition.
 
-**Open questions that would change ranking:**
-- Q1. Will the public build ship **notarized with hardened runtime + App Sandbox**? (Directly sets whether TM-001/TM-002 stay high.)
-- Q2. Is there any planned **auto-update mechanism**? (None found; an insecure updater would introduce a new high-severity boundary.)
-- Q3. Will model downloads move to **pinned commit SHAs + integrity checks**, or stay on `main`? (Sets TM-004.)
+### Out of scope
 
-## System model
+- Third-party implementation defects without demonstrated MLXRead reachability.
+- The internal security of Apple, GitHub, Hugging Face, and Cloudflare, while
+  still treating each as a trust boundary.
+- Attacks that already control root or an administrator account and cross no
+  additional MLXRead boundary.
+- Speech quality and model-output correctness unless they create a security or
+  privacy impact.
 
-### Primary components
-- **Menu-bar app shell** — `MLXRead/App/` (`MLXReadApp.swift`, `AppDelegate.swift`, `AppState.swift`). Composition root; owns services; installs memory-pressure and lifecycle handlers.
-- **Global hotkey service** — `MLXRead/Hotkey/GlobalHotkeyService.swift`. A `CGEventTap` on `.cgSessionEventTap` (active/`.defaultTap`) that sees all key-down events, suppresses only ⌥⎋.
-- **Selection capture** — `MLXRead/Accessibility/` : `AXSelectedTextReader.swift` (Accessibility API), `ClipboardSelectionReader.swift` (synthetic ⌘C fallback), `PasteboardSnapshot.swift` (changeCount-guarded restore).
-- **Speech pipeline** — `MLXRead/Speech/` : `SpeechCoordinator.swift` (state machine, generation UUIDs), `NativeMLXSpeechEngine.swift` (MLX inference), `TextNormalizer.swift`/`TextChunker.swift`.
-- **Audio playback** — `MLXRead/Audio/StreamingAudioPlayer.swift` (AVAudioEngine).
-- **Model store** — `MLXRead/Models/ModelStore.swift`. Download (via `swift-huggingface`), validation, disk management; sets `HF_HUB_CACHE`.
-- **System voice provider extension** — `SystemVoiceProvider/` : sandboxed `ausp` Audio Unit exposing an `AVSpeechSynthesisProviderVoice`.
-- **Build/release** — `project.yml`, `Package.resolved`, `script/*.sh`.
+### Confirmed assumptions
+
+- A1. `mlxread.com`, the support/report Worker, a signed macOS app, and its
+  update path are public surfaces. There are no accounts or tenants.
+- A2. Selected and spoken text is highly sensitive and forbidden from website,
+  support, report, storage, and logging paths.
+- A3. Reporter-entered email/message/description and enumerated privacy-safe
+  diagnostic metadata are permitted data.
+- A4. Same-user unprivileged processes, local privilege escalation, and
+  signing/update bypass are in scope; an already-root/admin adversary is not.
+- A5. macOS 14+ on Apple Silicon is the supported app environment, and users
+  intentionally grant Accessibility access.
+- A6. Source intent, local artifact proof, deployment, and live readback are
+  separate evidence planes.
+
+### Open decisions that affect risk
+
+- O1. R2 report objects have no deletion/retention rule visible in source.
+- O2. Report download URLs are bearer capabilities; there is no authenticated
+  maintainer identity in front of `/d/:id`.
+- O3. Model/G2P assets are not verified against a repository-owned digest
+  manifest.
+- O4. The checked-in Sparkle feed remains intentionally inactive until real
+  release-specific feed, key, archive length, URL, and signature values exist.
+
+## 3. System model
+
+### Components
+
+- **App shell and settings** — owns lifecycle, user preferences, model state,
+  Accessibility state, and the report UI.
+- **Capture boundary** — `CGEventTap`, AX selection read, and a general
+  pasteboard fallback with `changeCount`-guarded restoration.
+- **Local speech path** — normalization, chunking, MLX inference, and local
+  audio playback; reading content should remain inside this path.
+- **Asset path** — Hugging Face model/G2P downloads into the app's local cache.
+- **Update path** — Sparkle over HTTPS with EdDSA verification, but only after
+  release-specific configuration passes the placeholder guard.
+- **Leptos website** — stateless pages plus same-origin server functions;
+  security headers include a CSP, frame denial, no-sniff, and referrer policy.
+- **Delivery Worker** — validates support/report inputs, rate-limits on KV,
+  sends only to the configured maintainer, and stores report ZIPs in R2.
+- **Build/release path** — XcodeGen, pinned Swift packages, build
+  plugins/macros, Developer ID signing, Apple notarization, GitHub release, and
+  Cloudflare deployment.
 
 ### Data flows and trust boundaries
-- **Foreground app (untrusted content) → AX reader**: selected text (high-sensitivity) crosses via the Accessibility API (IPC brokered by macOS). Guarantees: requires Accessibility trust; 0.5 s AX messaging timeout. Validation: type/emptiness checks only — content is opaque text. Evidence: `AXSelectedTextReader.swift:36` (`captureNow`), `:57` (`kAXSelectedTextAttribute`).
-- **Foreground app → clipboard fallback → general pasteboard → app**: synthetic ⌘C places the selection on `NSPasteboard.general` (world-readable by clipboard managers for the window between copy and restore), then app reads and restores prior contents only if `changeCount` is unchanged. Evidence: `ClipboardSelectionReader.swift:80-87` (synth ⌘C), `PasteboardSnapshot.swift:34-47` (guarded restore).
-- **Keyboard (all apps) → event tap**: every key-down transits the tap callback; only ⌥⎋ is consumed, the rest passed through. Capability boundary: the tap *can* observe all keystrokes even though it acts on one. Evidence: `GlobalHotkeyService.swift:45-52`, `:105-124`.
-- **App → Hugging Face (`https://huggingface.co`) → local model cache**: model weights + G2P assets (safetensors/JSON) over TLS. Guarantees: HTTPS default, ATS on (hardened runtime aside, no ATS opt-out in Info.plist). Validation gap: revision `"main"` (mutable), **no content hash/signature check**. Evidence: `ModelStore.swift:87-113` (`download`), mlx-audio `ModelUtils.swift:127` (`revision: "main"`), `ModelStore.swift:60-77` (`validate` = presence/JSON-parse only).
-- **App → speech provider extension**: the system speech daemon brokers `AVSpeechSynthesisProviderRequest` (SSML) into the sandboxed appex. Guarantees: appex is App-Sandboxed (`SystemVoiceProvider.entitlements`), offline render. Evidence: `project.yml:81-84`, `SystemVoiceProvider/MLXReadProviderAudioUnit.swift`.
-- **Config/env → app**: `setenv("HF_HUB_CACHE", …)` at startup; `swift-huggingface` also honors `HF_ENDPOINT`/`HF_TOKEN` from the environment. Boundary: process env is operator/local-attacker controlled. Evidence: `ModelStore.swift:24`.
-- **Build inputs → signed artifact**: `project.yml` + `Package.resolved` (17 pinned revisions) → xcodebuild with `-skipPackagePluginValidation -skipMacroValidation` → `dist/MLXRead.app`. Boundary: SPM build plugins/macros execute at build time. Evidence: `script/package.sh:22-23`, `Package.resolved`.
 
-#### Diagram
 ```mermaid
-flowchart TD
-  subgraph Untrusted
-    FG["Foreground app content"]
-    KB["All keyboard input"]
-    HF["Hugging Face repos"]
-  end
-  subgraph LocalHost
-    PB["General pasteboard"]
-    ENV["Process environment"]
-    LP["Local processes"]
-  end
-  subgraph MLXRead
-    TAP["Event tap"]
-    AX["AX reader"]
-    CLIP["Clipboard fallback"]
-    COORD["Speech coordinator"]
-    ENGINE["MLX engine"]
-    STORE["Model store"]
-    CACHE["Model cache on disk"]
-    APPEX["Voice provider extension"]
-  end
-  subgraph BuildTier
-    YML["project.yml and pins"]
-    SPM["SPM plugins and macros"]
-    ART["Signed app artifact"]
-  end
-  KB -->|all keys seen| TAP
-  TAP -->|only optesc| COORD
-  FG -->|selected text| AX
-  FG -->|synthetic copy| CLIP
-  CLIP -->|transits| PB
-  AX --> COORD
-  CLIP --> COORD
-  COORD --> ENGINE
-  STORE -->|https no hash check| HF
-  HF --> CACHE
-  ENV -->|endpoint and cache vars| STORE
-  ENGINE --> CACHE
-  COORD --> APPEX
-  LP -->|task port get task allow| ENGINE
-  YML --> SPM
-  SPM --> ART
+flowchart LR
+  U["User and foreground app"] -->|"selected text"| C["AX or clipboard capture"]
+  C -->|"memory only"| S["Local MLX speech and audio"]
+  S -->|"no reading content"| D["Diagnostic metadata and MLXRead logs"]
+  D -->|"explicit user send"| R["Delivery Worker report endpoint"]
+  R -->|"ZIP plus metadata"| O["R2 bearer object"]
+  R -->|"restricted destination"| E["Maintainer email"]
+  V["Website visitor"] -->|"support fields"| W["Leptos same-origin function"]
+  W -->|"validated message"| K["Delivery Worker contact endpoint"]
+  K --> E
+  A["Hugging Face repositories"] -->|"HTTPS mutable assets"| M["Local model cache"]
+  M --> S
+  G["Signed app release"] -->|"configured HTTPS plus EdDSA"| P["Sparkle update"]
+  B["Dependencies and build host"] --> G
 ```
 
-## Assets and security objectives
+Boundary notes:
 
-| Asset | Why it matters | Security objective (C/I/A) |
+- The clipboard fallback briefly places reading content on the general
+  pasteboard, which same-user software can observe.
+- `APP_TOKEN` ships in the app binary and is not a secret; it is only a
+  low-friction abuse signal alongside size and rate controls.
+- Contact submissions proxied by the site Worker share the proxy's network
+  identity, so the API throttles contact by normalized sender email.
+- R2 identifiers are 128-bit random values. Entropy makes guessing unlikely,
+  but possession of a URL is sufficient to retrieve its bundle.
+- The site has no account, cookie, analytics, or tenancy boundary.
+
+## 4. Assets and security objectives
+
+| Asset | Objective | Why it matters |
 |---|---|---|
-| Selected text in memory | May contain passwords, keys, legal/financial content (A2); the app's core data | Confidentiality |
-| Clipboard contents (user's own) | Fallback transits/restores it; corruption or leakage harms the user | Confidentiality, Integrity |
-| Keystroke stream visible to the tap | The tap sees all keys; abuse = keylogging | Confidentiality |
-| Model cache on disk | Drives inference; a tampered model is code/behavior the app trusts | Integrity |
-| Accessibility trust grant | The master capability enabling capture + tap | Integrity (of who holds it) |
-| Signed app artifact | Publicly distributed; users trust its provenance | Integrity, Authenticity |
-| Build pins (`Package.resolved`, model pins) | Determine what code/weights ship | Integrity |
-| App availability (reader works when invoked) | Utility value; low blast radius if down | Availability (low) |
+| Selected/spoken text | Confidentiality | May contain credentials, legal, medical, or financial material |
+| General pasteboard snapshot | Confidentiality and integrity | Fallback must not leak or corrupt unrelated clipboard data |
+| Accessibility and event-tap grant | Integrity | It can observe selections and global key events |
+| Diagnostic ZIP and support content | Confidentiality and integrity | Contains user-entered content, device/app metadata, logs, and IP metadata |
+| R2 bearer URL | Confidentiality | It is the sole access capability for a stored report |
+| Model/G2P cache | Integrity | Unverified assets drive in-process parsing and speech behavior |
+| Signed app, update key, and appcast | Authenticity and integrity | Compromise can distribute a privileged look-alike or malicious update |
+| Build host and dependency pins | Integrity | They determine what receives the trusted signature |
+| Website/Worker availability | Availability | Abuse can suppress support or create delivery cost/noise |
 
-## Attacker model
+## 5. Attacker model
 
 ### Capabilities
-- **Local unprivileged process** running as the same user: can enumerate processes, attempt to attach to task ports, read `NSPasteboard.general`, set environment variables for child/relaunched processes, and read the model cache directory.
-- **Network/supply-chain adversary** on the model path: controls or compromises a Hugging Face repo (`mlx-community/*`, `beshkenadze/*`) or performs a TLS-terminating MITM with a trusted cert, delivering altered weights/config/G2P assets from a mutable `main` ref.
-- **Malicious dependency author** in the build tier: ships a transitive SPM package containing a build plugin or macro.
-- **Shoulder/side-channel adversary**: can observe audio output (the app speaks selected text aloud — an inherent, accepted property).
 
-### Non-capabilities
-- **No remote network attacker** against a listening service — the app exposes **no ports, RPC, or IPC listeners** (grep for listeners/URLSession servers is empty; only outbound HTTPS on download).
-- Cannot achieve code execution via model weights alone: **safetensors is a data format** (no pickle/arbitrary-code deserialization), so a tampered model degrades to integrity/behavior manipulation, not direct RCE (downgrades TM-004).
-- Cannot bypass the changeCount guard to silently corrupt the clipboard when the user/another app has written after capture (`PasteboardSnapshot.swift:34`).
-- Cannot read selected text from logs — logging is counts/`<private>` only (`AppLogger.swift`, `SpeechCoordinator.swift` state logs use `.public` only on state names).
-- Root/kernel-level local attackers are out of scope (they already own the machine).
+- An unauthenticated internet client can call public website and Worker routes,
+  forge user-entered fields, replay the non-secret app token, and distribute a
+  leaked report URL.
+- A same-user unprivileged process can observe the general pasteboard, attempt
+  debugger/task-port attachment, influence a development process environment,
+  and read user-readable model-cache files.
+- A compromised model repository or trusted TLS endpoint can change mutable
+  model/G2P assets.
+- A malicious or compromised dependency/build host can run code during a
+  release build and attempt to steal signing material or alter the artifact.
+- A release-channel attacker may control a feed host but not the maintainer's
+  Ed25519 private key.
 
-## Entry points and attack surfaces
+### Non-capabilities and constraints
 
-| Surface | How reached | Trust boundary | Notes | Evidence |
-|---|---|---|---|---|
-| Global event tap | Any keystroke system-wide | Keyboard → app | Active tap sees all key-downs; acts only on ⌥⎋ | `GlobalHotkeyService.swift:45-52,105-124` |
-| AX selection read | ⌥⎋ / menu → focused element | Foreground app → app | Reads arbitrary foreground selection incl. secure contexts if exposed | `AXSelectedTextReader.swift:36,57` |
-| Clipboard fallback | ⌥⎋ when AX yields nothing | Foreground app → pasteboard → app | Selection transits world-readable pasteboard briefly | `ClipboardSelectionReader.swift:80-87` |
-| Model download | Settings → Models → Download | App → Hugging Face | Mutable `main`, no integrity verification | `ModelStore.swift:87-113`; `ModelUtils.swift:127` |
-| Model cache load | Any read after download | Disk → engine | `validate()` checks presence/JSON only, not authenticity | `ModelStore.swift:60-77` |
-| Env-driven config | Process env at launch | Env → app | `HF_ENDPOINT`/`HF_TOKEN`/`HF_HUB_CACHE` influence fetch/cache | `ModelStore.swift:24` |
-| Speech provider request | System TTS → appex (SSML) | Daemon → sandboxed appex | Sandboxed, offline render; placeholder synthesis today | `MLXReadProviderAudioUnit.swift` |
-| Task port (memory) | Local process attaches | Local process → app | `get-task-allow=true`, no hardened runtime/sandbox in build | `dist/MLXRead.app` entitlements; `project.yml:22` |
-| Build plugins/macros | `xcodebuild` during release | Dependency → build host | Validation prompts skipped in scripts | `script/package.sh:22-23` |
+- The app exposes no inbound listener; remote app compromise must enter through
+  an outbound asset/update parser or a distribution path.
+- Release hardened runtime and absent `get-task-allow` materially constrain
+  same-user task-port attachment; Debug builds intentionally do not prove this.
+- Sparkle rejects an unsigned update when a real public key is configured.
+- The Worker email binding can send only to the configured maintainer, limiting
+  open-relay impact.
+- Random report IDs are impractical to brute-force at 128 bits; disclosure is
+  more likely through logs, email, browser history, forwarding, or maintainer
+  endpoint compromise.
 
-## Top abuse paths
+## 6. Entry points and attack surfaces
 
-1. **Memory scrape of live selection.** Local unprivileged process → attaches to MLXRead's task port (allowed by `get-task-allow=true`, no hardened runtime) → reads the in-memory selection buffer / MLX tensors during a read → exfiltrates high-sensitivity text. Impact: confidentiality breach of the exact asset the app is designed to protect.
-2. **Passive keylogging via the trust grant.** An attacker who can modify or repackage the app (unsigned/altered build a user is tricked into running) → widens the existing `.cgSessionEventTap` callback to record all key-downs (the tap already receives them) → persists keystrokes. Impact: full keylogger under a benign-looking utility. (Prereq: artifact integrity failure — ties to TM-002.)
-3. **Malicious model weight substitution.** Supply-chain attacker compromises `mlx-community/Kokoro-82M-bf16` or a `beshkenadze/*` G2P repo on `main` → user downloads → `validate()` accepts it (presence/JSON only) → altered model runs in-process. Impact: integrity of synthesis + a foothold for any future weight-parsing bug; contained by safetensors being data-only.
-4. **Endpoint redirection via environment.** Local attacker sets `HF_ENDPOINT=http://attacker.example` (or a rogue HTTPS host) in the environment MLXRead inherits → download is redirected. ATS blocks cleartext by default, so this needs a rogue TLS host or an `HF_TOKEN` exfil angle. Impact: model tampering / token theft if a token is present.
-5. **Clipboard exfiltration timing.** A clipboard-manager or local process polling `NSPasteboard.general` reads the selection during the brief window it is on the pasteboard in the fallback path. Impact: confidentiality leak of selections in apps lacking AX text (fallback-only apps).
-6. **Build-time code execution via dependency.** A transitive SPM package ships a malicious build plugin/macro → executes on the build/release host during `xcodebuild` (validation prompts skipped) → tampers the artifact or steals signing material. Impact: compromised public release. (Contained by `Package.resolved` pinning to specific revisions.)
-7. **Denial via event-tap starvation.** Not attacker-driven remotely, but a wedged main queue could delay the tap; macOS auto-disables slow taps. Impact: the ⌥⎋ shortcut and possibly other input handling degrade until re-enabled (already handled at `GlobalHotkeyService` re-enable path). Low.
+| Surface | Boundary | Existing controls | Residual concern |
+|---|---|---|---|
+| Option–Escape event tap | Global keyboard → app | Narrow callback and trust-revocation handling | Repackaged or compromised app could widen behavior |
+| AX selection capture | Foreground app → app memory | Accessibility consent and bounded capture | Core high-sensitivity data enters process memory |
+| Clipboard fallback | App ↔ general pasteboard | Snapshot plus race-aware restore | Same-user clipboard observers can see temporary selection |
+| Model/G2P download | Hugging Face → local cache | HTTPS, safetensors requirement, structural checks | Mutable upstream state; no shipped digest manifest |
+| Sparkle feed/archive | GitHub/HTTPS → updater | Placeholder guard and EdDSA verification | Checked-in feed inactive; release config/key custody remains critical |
+| Website `/api/*` | Browser → Leptos Worker | Same-origin policy, methods/types/body limit, CSP | No identity; direct API Worker remains public |
+| API `/contact` | Internet/site proxy → email | Validation, honeypot, KV throttle, restricted recipient | Email-key throttling is gameable and KV increments are non-atomic |
+| API `/report` | App/internet → R2/email | Non-secret token, size cap, IP throttle, restricted recipient | Token replay; free-form description; ZIP content trusted from client |
+| API `/d/:id` | Bearer URL → R2 object | Random 128-bit ID and `private, no-store` | No authenticated maintainer gate or visible expiry |
+| Build and release | Dependencies/build host → signed app | Pin file, Developer ID, notarization, GitHub digest | Validation-skip flags and signing-key exposure on build host |
 
-## Threat model table
+## 7. Top abuse paths
 
-| Threat ID | Threat source | Prerequisites | Threat action | Impact | Impacted assets | Existing controls (evidence) | Gaps | Recommended mitigations | Detection ideas | Likelihood | Impact severity | Priority |
-|---|---|---|---|---|---|---|---|---|---|---|---|---|
-| TM-001 **[resolved]** | Local unprivileged process | App running a read; attacker code runs as same user | Attach to task port and scrape in-memory selection/tensors | Exfiltration of high-sensitivity text | Selected text in memory | **Public release: Developer ID + Hardened Runtime + `CODE_SIGN_INJECT_BASE_ENTITLEMENTS=NO` → `get-task-allow` absent** (verified); App Sandbox infeasible (global tap + system-wide AX) | Residual: not yet notarized (needs Apple credentials), so first launch shows a Gatekeeper prompt — a usability, not memory-safety, gap | Notarize the release to remove the Gatekeeper prompt; optionally minimize selection-buffer lifetime | EndpointSecurity task-port/debugger-attach alerts on the app | Low | High | **low** |
-| TM-002 **[mitigated]** | Attacker distributing a tampered build | User runs an unsigned/altered copy | Repackage app to widen the existing keyboard tap into a keylogger | Full keystroke capture under a trusted-looking app | Keystroke stream, Accessibility grant | **Sparkle 2 EdDSA-signed appcast over HTTPS** verifies every update pre-install (`UpdateService.swift`, `docs/updates.md`); updater refuses non-HTTPS feeds | Initial download provenance still depends on notarization; private signing key must stay maintainer-held | Notarize release; publish checksums; keep the Ed25519 private key off CI/repo (already `.gitignore`d) | Gatekeeper/notarization telemetry; user-facing signature display | Low | High | **medium** |
-| TM-003 | Supply-chain (HF repo) or TLS MITM | Compromise a model/G2P repo or a trusted-cert MITM | Serve altered weights/config from mutable `main` | Model integrity compromise; latent parser-exploit foothold | Model cache, synthesis integrity | HTTPS + ATS default; SPM code pinned; presence/JSON validation (`ModelStore.swift:60-77`) | Revision `"main"` (`ModelUtils.swift:127`); **no hash/signature verification** of downloaded files | Pin model **commit SHAs**; verify SHA-256 of each file against a shipped manifest before load; prefer safetensors-only, reject pickle | Log/verify downloaded file digests; alert on mismatch | Low | Medium | **medium** |
-| TM-004 | Local attacker via environment | Ability to set env for MLXRead's process | Set `HF_ENDPOINT`/`HF_TOKEN` to redirect fetch or capture token | Model tampering; token theft if token present | Model cache, any HF token | ATS blocks cleartext; app sets no token by default | App inherits `HF_ENDPOINT`/`HF_TOKEN` from env (`swift-huggingface`); `HF_HUB_CACHE` set unconditionally (`ModelStore.swift:24`) | Pin endpoint to `huggingface.co` in-app (ignore `HF_ENDPOINT`); never read tokens from ambient env for a no-account app | Log resolved endpoint at download; assert it equals the expected host | Low | Medium | **medium** |
-| TM-005 | Clipboard-observing local process | AX fails so fallback runs; attacker polls pasteboard | Read selection during the copy→restore window | Confidentiality leak of fallback-path selections | Selected text, clipboard | changeCount-guarded restore; fallback is opt-in default-on (`PasteboardSnapshot.swift:34`) | Selection is unavoidably on `NSPasteboard.general` momentarily; visible to clipboard managers | Mark items `org.nspasteboard.ConcealedType`/transient; minimize window; make fallback opt-in for sensitive apps | N/A (OS-level pasteboard access is broad) | Low | Medium | **low** |
-| TM-006 | Malicious transitive dependency | A pinned package pulls a build plugin/macro | Execute code on build/release host at build time | Compromised artifact / signing material | Signed artifact, build pins | `Package.resolved` pins 17 revisions; exact pin of mlx-audio-swift | Scripts pass `-skipPackagePluginValidation -skipMacroValidation` (`script/package.sh:22-23`) | Build/release on an isolated runner; review new plugins/macros; drop the skip flags in release builds or vet plugins explicitly | CI diff on `Package.resolved`; alert on new plugin/macro targets | Low | High | **medium** |
-| TM-007 | Local process | App running | Cause event-tap disable/starvation | ⌥⎋ (and input handling) degradation | App availability | Auto re-enable on `tapDisabledByTimeout/UserInput` (`GlobalHotkeyService.swift`) | Main-queue stalls could delay dispatch | Keep tap handler O(1) (already); watchdog to reinstall tap | Log tap-disable events already emitted | Low | Low | **low** |
+1. **Reading-content privacy regression:** a future log statement, exception,
+   report field, or automatic form population includes selection text → user
+   sends a report → Worker stores/emails the content. This crosses the core
+   promise despite every network component functioning as designed.
+2. **Report disclosure:** a diagnostic ZIP is submitted → bearer URL appears in
+   email/history/logging → a recipient forwards or loses the URL → another
+   party downloads the ZIP; no expiry or authenticated gate limits the window.
+3. **Unauthenticated endpoint abuse:** an attacker copies the app token or calls
+   `/contact` directly → rotates emails/IPs or races KV increments → generates
+   maintainer mail, R2 objects, and operational cost/noise.
+4. **Model substitution:** an upstream repo or trusted endpoint changes a
+   mutable model/G2P asset → the app accepts structural validity without a
+   repository-owned digest → altered data reaches an in-process parser/model.
+5. **Release compromise:** a dependency/plugin or build-host adversary tampers
+   before signing or steals signing/update keys → users receive an artifact
+   that can exploit the Accessibility grant. Notarization and EdDSA help only
+   when their keys and signing inputs remain trustworthy.
+6. **Clipboard observation:** an app without usable AX selection triggers the
+   Command-C fallback → a clipboard manager reads the temporary selection before
+   restoration → local confidentiality is lost without any MLXRead network use.
 
-## Criticality calibration
+## 8. Threat table
 
-_For THIS repo: an offline, no-listener desktop utility whose crown-jewel asset is transient high-sensitivity text, holding a keylogging-capable OS grant, distributed publicly._
+| ID | Threat source and prerequisites | Action and impact | Existing controls | Gaps and recommended mitigation | Detection | Likelihood | Severity | Priority |
+|---|---|---|---|---|---|---|---|---|
+| TM-001 | Code regression; user sends report | Selected/spoken text enters logs, description, ZIP, support payload, R2, or email | Capture is not read by `DebugBundle`; `AppLogger` invariant; UI disclosure; source comments | Add automated content-canary tests across logs, generated ZIP, multipart body, and Worker fixtures; reject any automatic reading-content field | Privacy regression test and sampled bundle schema audit | Low | High | **High** |
+| TM-002 | Bearer URL leak after a report exists | Unauthorized diagnostic ZIP download; long-lived metadata/content exposure | 128-bit random ID; no listing route; `private, no-store` | Put `/d/*` behind maintainer authentication or issue one-time/expiring signed capabilities; define and enforce R2 lifecycle deletion | Access logs keyed by object ID; deletion receipts | Medium | High | **High** |
+| TM-003 | Unauthenticated client; copied app token; many IPs/emails | Mail/R2 abuse, support denial, cost and alert fatigue | Input/size caps, honeypot, best-effort KV throttles, restricted email destination | Treat app token as public; use atomic rate limiting/bot defense and route-specific quotas; bound R2 writes | 429/error ratios, R2 object rate, email-volume alerts | Medium | Medium | **Medium** |
+| TM-004 | Compromised mutable model/G2P upstream or trusted TLS endpoint | Altered assets accepted into cache and parsed in-process | HTTPS/ATS; safetensors extension and non-empty/config JSON checks | Pin immutable revisions and verify every file against a shipped digest manifest before activation | Record expected/actual digests without content; fail closed on mismatch | Low | High | **High** |
+| TM-005 | Feed/build misconfiguration or release-key compromise | Malicious or unavailable update/distribution channel | Placeholder guard; HTTPS; Sparkle EdDSA; Developer ID; hardened runtime; notarization; stapling; GitHub asset digest | Replace templates only in a controlled release transaction; keep update private key off repo and least-privileged; verify public appcast/archive/signature live | Release receipt covering code signature, notarization, digest, appcast signature, and live fetch | Low | High | **High** |
+| TM-006 | Malicious dependency, plugin/macro, or compromised build host | Tamper with signed app or steal signing material | Swift package pins, Apple signing/notarization | Release scripts skip plugin/macro validation; isolate release host, review pin/plugin changes, avoid validation bypass for release, use short-lived credentials | Dependency diff gate, build provenance, key-use alerts | Low | High | **Medium** |
+| TM-007 | Same-user clipboard observer; fallback required | Reads temporary selected text from general pasteboard | AX first; bounded fallback; `changeCount`-safe restoration; user can disable fallback | Document residual risk; consider per-app fallback consent/deny list and minimize exposure window | Count fallback use without content; user-visible fallback indicator | Medium | Medium | **Medium** |
+| TM-008 | Same-user process targeting Debug or mis-signed artifact | Attach/debug and read process memory | Public local artifact is Developer ID-signed, hardened, notarized, stapled, with no release `get-task-allow` | Make release gate fail if hardened runtime/notarization/entitlements differ; never distribute Debug builds | `codesign`, `spctl`, stapler, and entitlement checks bound to release digest | Low | High | **Medium** |
+| TM-009 | Cross-origin client or oversized/unsupported server-function request | CSRF-like submission, parser/resource abuse, or header-policy bypass | Same-origin/Sec-Fetch policy, POST content-type allowlist, 4 KiB body cap, CSP, frame denial, no cookies | Retain tests for missing/spoofed forwarding headers and deployed proxy behavior; remember direct delivery Worker endpoints are separately public | Synthetic route probes and edge error-rate alerts | Low | Medium | **Medium** |
 
-- **Critical** — Any path yielding silent, remote-triggered exfiltration of selected text or keystrokes to an off-device attacker, or code execution in the shipped app from attacker-controlled input. _Examples: a remote-triggerable memory disclosure (none exists today); a model-load path that executes attacker code (blocked by safetensors-data-only); a network listener leaking captures (none)._
-- **High** — Local exfiltration of the core assets enabled by the app's own configuration, or artifact-integrity failures that convert the app into a keylogger. _Examples: TM-001 (task-port memory scrape via `get-task-allow`), TM-002 (tampered/notarization-less distribution → keylogger)._
-- **Medium** — Integrity/supply-chain compromises requiring attacker control of the model source or build tier, contained by data-only formats or pinning. _Examples: TM-003 (unverified model on `main`), TM-004 (env endpoint/token redirection), TM-006 (build-plugin execution)._
-- **Low** — Narrow-window confidentiality leaks with broad OS-level preconditions, or easily-recovered availability issues. _Examples: TM-005 (pasteboard timing window), TM-007 (tap starvation with auto-recovery)._
+## 9. Criticality calibration
 
-## Focus paths for security review
+- **Critical:** remotely triggered code execution or silent selected-text
+  exfiltration at scale without prior local execution. No confirmed path exists.
+- **High:** a practical violation of the reading-content invariant, unauthorized
+  diagnostic-bundle disclosure, malicious signed/update distribution, or
+  in-process asset parser compromise.
+- **Medium:** bounded endpoint abuse, same-user clipboard observation,
+  distribution hardening regression with additional prerequisites, or support
+  availability/cost impact.
+- **Low:** self-recovering local availability failures with no privacy or
+  integrity consequence.
 
-| Path | Why it matters | Related Threat IDs |
+Priority combines likelihood, impact, and the leverage of the control; it is
+not a generic CVSS score.
+
+## 10. Focus paths for security review
+
+| Path | Review focus | Threats |
 |---|---|---|
-| `project.yml` | Entitlements/signing config; `ENABLE_HARDENED_RUNTIME: NO`, no App Sandbox, sets `get-task-allow` in shipped build | TM-001, TM-002 |
-| `script/package.sh` | Release signing step; non-notarized, skips plugin/macro validation | TM-002, TM-006 |
-| `MLXRead/Models/ModelStore.swift` | Download + `validate()`; mutable ref, no integrity check; sets `HF_HUB_CACHE` | TM-003, TM-004 |
-| `MLXRead/Hotkey/GlobalHotkeyService.swift` | Active tap sees all keystrokes; keylogging capability boundary | TM-001, TM-002, TM-007 |
-| `MLXRead/Accessibility/ClipboardSelectionReader.swift` | Synthetic ⌘C places selection on the general pasteboard | TM-005 |
-| `MLXRead/Accessibility/PasteboardSnapshot.swift` | changeCount-guarded restore; correctness protects user clipboard | TM-005 |
-| `MLXRead/Speech/NativeMLXSpeechEngine.swift` | Loads model cache into process; where a tampered model executes | TM-003 |
-| `MLXRead.xcodeproj/.../Package.resolved` | The dependency pin set that defines what ships | TM-006 |
-| `SystemVoiceProvider/SystemVoiceProvider.entitlements` | The one sandboxed component; confirm sandbox stays enabled as MLX is wired in | TM-003 |
+| `MLXRead/Reporting/DebugBundle.swift` | Enumerated bundle schema and log-content invariant | TM-001, TM-002 |
+| `MLXRead/Reporting/ReportSender.swift` | Free-form fields, multipart construction, endpoint contract | TM-001, TM-003 |
+| `MLXRead/Support/AppLogger.swift` and all call sites | No selected/spoken text or derived reversible content | TM-001 |
+| `api/src/index.js` | Public-route authorization, rate limiting, R2 lifecycle, bearer download | TM-002, TM-003 |
+| `api/wrangler.jsonc` | Canonical origin, least-privilege bindings, observability data | TM-003, TM-009 |
+| `website/src/lib.rs` and generated Pages Worker | Same-origin/body policy, CSP, proxy behavior | TM-009 |
+| `MLXRead/Models/ModelStore.swift` and dependency model resolver | Immutable revisions and digest verification | TM-004 |
+| `project.yml`, `appcast.xml`, `MLXRead/Updates/UpdateService.swift` | Fail-closed update activation and release-specific authority | TM-005 |
+| `script/package.sh`, `script/notarize.sh`, `Package.resolved` | Build-host execution, signature/notarization proof, key custody | TM-005, TM-006, TM-008 |
+| `MLXRead/Accessibility/ClipboardSelectionReader.swift` | Exposure window and restoration correctness | TM-007 |
 
-## Quality check
+## 11. Quality check
 
-- **Entry points covered:** event tap, AX read, clipboard fallback, model download, cache load, env config, provider request, task port, build plugins — all appear in the threat table or abuse paths. ✔
-- **Each trust boundary represented:** keyboard→app (TM-001/002/007), foreground→app (TM-001/003/005), app→HF (TM-003/004), env→app (TM-004), disk→engine (TM-003), build→artifact (TM-006), daemon→appex (noted; sandboxed, no distinct threat beyond TM-003). ✔
-- **Runtime vs CI/dev separated:** runtime threats TM-001–005/007; build-tier isolated as TM-006 with its own boundary. ✔
-- **User clarifications reflected:** public distribution (raises TM-001/TM-002 to high), high data sensitivity (drives asset weighting), build tier in scope (TM-006). ✔
-- **Assumptions & open questions explicit:** A1–A5 and Q1–Q3 stated; conditional items (notarization, auto-update, SHA pinning) flagged. ✔
-- **Non-capabilities stated to avoid inflation:** no remote listener, safetensors data-only, no subprocess/eval, log redaction. ✔
+- Public website, server functions, delivery Worker, app reporting, R2, update,
+  asset download, local capture, and build/release entry points are covered.
+- Runtime, public-service, and build/release threats are separated.
+- No mitigation is credited beyond source evidence or the checked local/public
+  artifact evidence; deployment and live readback remain distinct.
+- The “no accounts” boundary does not erase support/report user data.
+- Root/admin compromise is excluded narrowly; same-user attacks, local
+  privilege escalation, and update/signing bypass remain in scope.
+- Highest-priority recommendations preserve the product invariant without
+  weakening controls, deleting tests, or treating documentation as remediation.

@@ -4,7 +4,7 @@ use leptos_router::components::A;
 use crate::components::home_page::REPO_URL;
 use crate::components::page_meta::PageMeta;
 
-/// Privacy policy. MLXRead collects nothing; this page states that plainly.
+/// Privacy policy. Reading content stays local; support/report data is explicit.
 #[component]
 pub fn PrivacyPage() -> impl IntoView {
     view! {
@@ -16,11 +16,11 @@ pub fn PrivacyPage() -> impl IntoView {
         <main class="shell">
             <article class="legal band">
                 <p class="eyebrow">"Privacy Policy"</p>
-                <h1>"MLXRead collects nothing."</h1>
-                <p class="legal__updated mono muted">"Last updated: July 2026"</p>
+                <h1>"Your reading content stays on your Mac."</h1>
+                <p class="legal__updated mono muted">"Last updated: August 2026"</p>
 
                 <p class="legal__lede">
-                    "MLXRead is a local macOS app that reads your selected text aloud with an on-device model. It has no account system, no analytics, and no server. There is nothing for us to collect, because your data never reaches us."
+                    "MLXRead reads selected text with an on-device model. Selected and spoken text is never transmitted, stored by the website, or included in a problem report. Networked support and delivery surfaces handle only the information described below."
                 </p>
 
                 <Section title="The app">
@@ -37,20 +37,32 @@ pub fn PrivacyPage() -> impl IntoView {
                         "Synthesis runs in-process on your Mac's GPU. Selected text is never transmitted anywhere."
                     </Item>
                     <Item>
-                        "The network is used only to download a voice model the first time you request one, and to check for app updates. After a model is downloaded, MLXRead works fully offline."
+                        "Network use is limited to model and pronunciation assets, configured update checks, and problem reports you explicitly send. Local reading works offline after required assets are cached."
                     </Item>
                     <Item>
-                        "App updates are delivered over HTTPS from GitHub and cryptographically verified (EdDSA) before installing. The update check sends only what a normal file download sends."
+                        "When a release update feed is configured, Sparkle uses HTTPS and verifies each update's EdDSA signature before installing. Source builds with placeholder feed settings keep updates inactive."
                     </Item>
                 </Section>
 
                 <Section title="This website">
                     <Item>"This site sets no cookies and runs no analytics or trackers."</Item>
                     <Item>
-                        "It is served from Cloudflare, which processes standard request logs (such as IP address) for security and delivery, per Cloudflare's own policies. We do not add to or retain that data."
+                        "It is served from Cloudflare, which may process standard request metadata such as IP address for security and delivery under Cloudflare's policies. The site adds no analytics or behavioral tracking."
+                    </Item>
+                    <Item>
+                        "If you use the support form, its name, email, topic, message, and standard request metadata are delivered to the maintainer. Do not paste selected or spoken text into the form."
                     </Item>
                     <Item>
                         "The download links point to GitHub Releases; downloading is subject to GitHub's policies."
+                    </Item>
+                </Section>
+
+                <Section title="Problem reports">
+                    <Item>
+                        "An in-app report sends the email and description you enter, app and Mac diagnostic metadata, and recent MLXRead logs. It never reads or includes selected or spoken text."
+                    </Item>
+                    <Item>
+                        "The delivery service stores report bundles behind high-entropy bearer links. Anyone who obtains a link can retrieve that bundle; the current service does not assert automatic deletion."
                     </Item>
                 </Section>
 

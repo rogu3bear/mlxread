@@ -28,7 +28,7 @@
   "vars": {
     "MAINTAINER_EMAIL": "james@jkca.me",
     "FROM_EMAIL": "mlxread@jkca.me",
-    "ALLOWED_ORIGIN": "https://mlxread-web.pages.dev",
+    "ALLOWED_ORIGIN": "https://mlxread.com",
     // Not a real secret (it ships inside the app binary); a low-friction gate
     // that deters drive-by abuse of /report. Real protection is the rate limit
     // + size caps + the restricted send binding.
