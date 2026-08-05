@@ -21,7 +21,8 @@ pub fn AppLayout(children: Children) -> impl IntoView {
                 <nav class="nav">
                     <a class="nav__link" href="/#how">"How it works"</a>
                     <a class="nav__link" href="/#privacy">"Privacy"</a>
-                    <a class="nav__link" href="/#speed">"Speed"</a>
+                    <a class="nav__link" href="/faq">"FAQ"</a>
+                    <a class="nav__link" href="/support">"Support"</a>
                     <a class="nav__link nav__link--cta" href="/#install">"Download"</a>
                 </nav>
             </div>
@@ -38,6 +39,8 @@ pub fn AppLayout(children: Children) -> impl IntoView {
                     </a>
                     <nav class="footer__links">
                         <a href="/#install">"Download"</a>
+                        <a href="/faq">"FAQ"</a>
+                        <a href="/support">"Support"</a>
                         <a href=REPO_URL rel="noopener" target="_blank">"Source"</a>
                         <a href="/privacy">"Privacy"</a>
                         <a href="/terms">"Terms"</a>

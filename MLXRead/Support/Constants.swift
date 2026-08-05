@@ -21,6 +21,7 @@ enum Constants {
         static let maximumSelectionLength = "maximumSelectionLength"
         static let onboardingCompleted = "onboardingCompleted"
         static let showSelectionPreview = "showSelectionPreview"
+        static let reporterEmail = "reporterEmail"
     }
 
     enum Defaults {
@@ -33,4 +34,13 @@ enum Constants {
 
     /// Hard bounds for the user-configurable maximum selection length.
     static let selectionLengthBounds = 500...100_000
+
+    /// In-app problem reporting. Reports POST a privacy-safe debug bundle to the
+    /// delivery worker, which emails it to the maintainer.
+    enum Report {
+        static let endpoint = URL(string: "https://mlxread-api.sp5qybrsvz.workers.dev/report")!
+        // Not a real secret — it ships inside the app binary; a low-friction gate
+        // backed by the worker's rate limits and size caps.
+        static let token = "mlxr_report_2f8c1a90b7"
+    }
 }

@@ -28,6 +28,7 @@ final class AppSettings {
     }
     var onboardingCompleted: Bool { didSet { defaults.set(onboardingCompleted, forKey: Constants.DefaultsKey.onboardingCompleted) } }
     var showSelectionPreview: Bool { didSet { defaults.set(showSelectionPreview, forKey: Constants.DefaultsKey.showSelectionPreview) } }
+    var reporterEmail: String { didSet { defaults.set(reporterEmail, forKey: Constants.DefaultsKey.reporterEmail) } }
 
     init(defaults: UserDefaults = .standard) {
         self.defaults = defaults
@@ -41,6 +42,7 @@ final class AppSettings {
         maximumSelectionLength = storedMax == 0 ? Constants.Defaults.maximumSelectionLength : storedMax.clamped(to: Constants.selectionLengthBounds)
         onboardingCompleted = defaults.bool(forKey: Constants.DefaultsKey.onboardingCompleted)
         showSelectionPreview = defaults.object(forKey: Constants.DefaultsKey.showSelectionPreview) as? Bool ?? Constants.Defaults.showSelectionPreview
+        reporterEmail = defaults.string(forKey: Constants.DefaultsKey.reporterEmail) ?? ""
     }
 
     var selectedModel: ModelInfo {

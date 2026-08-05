@@ -1,0 +1,37 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "mlxread-api",
+  "main": "src/index.js",
+  "compatibility_date": "2026-07-01",
+  "compatibility_flags": ["nodejs_compat"],
+  "observability": { "enabled": true },
+
+  // Email Routing send binding. Restricted so this worker can ONLY ever email
+  // the maintainer address -- it cannot be abused to send mail anywhere else.
+  // james@jkca.me must be a verified Email Routing destination on this account
+  // (jkca.me routes mail through Cloudflare Email Routing).
+  "send_email": [
+    { "name": "EMAIL", "destination_address": "james@jkca.me" }
+  ],
+
+  // Debug bundles from in-app error reports land here; the notification email
+  // carries an unguessable download link back to the object.
+  "r2_buckets": [
+    { "binding": "REPORTS", "bucket_name": "mlxread-reports" }
+  ],
+
+  // Lightweight per-IP rate limiting for the public endpoints.
+  "kv_namespaces": [
+    { "binding": "RL", "id": "d71c5035112b469ba457517aa7cb2238" }
+  ],
+
+  "vars": {
+    "MAINTAINER_EMAIL": "james@jkca.me",
+    "FROM_EMAIL": "mlxread@jkca.me",
+    "ALLOWED_ORIGIN": "https://mlxread-web.pages.dev",
+    // Not a real secret (it ships inside the app binary); a low-friction gate
+    // that deters drive-by abuse of /report. Real protection is the rate limit
+    // + size caps + the restricted send binding.
+    "APP_TOKEN": "mlxr_report_2f8c1a90b7"
+  }
+}

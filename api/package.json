@@ -1,0 +1,18 @@
+{
+  "name": "mlxread-api",
+  "version": "0.1.0",
+  "private": true,
+  "description": "MLXRead delivery worker: contact form + in-app error reports -> email (Cloudflare Email Routing) + R2.",
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "tail": "wrangler tail"
+  },
+  "dependencies": {
+    "mimetext": "^3.0.28"
+  },
+  "devDependencies": {
+    "wrangler": "4.83.0"
+  }
+}
