@@ -120,7 +120,7 @@ fn HeroDemo() -> impl IntoView {
                 <p class="lede">
                     "MLXRead replaces macOS Speak Selection with a local MLX voice. Select text in any app — Safari, Notes, Xcode, a PDF — press "
                     <OptEsc/>
-                    ", and hear it in about a second. Nothing is uploaded. Nothing is logged."
+                    ". With a warm Soprano model, audio begins in about a second. Selected text is never uploaded or logged."
                 </p>
                 <div class="hero__actions">
                     <A href="/get-started" attr:class="btn btn--primary">"Get started"</A>
@@ -248,7 +248,7 @@ fn Privacy() -> impl IntoView {
         "Selected text lives in memory only while it's being read — never written to disk.",
         "Selected text is never logged. Logs record lengths and timings, never content.",
         "No analytics, no crash-reporting SDK, no accounts.",
-        "The network is used exactly once — to download a voice model — then never again.",
+        "Model and pronunciation assets, update checks, and support use the network. Selected text never does.",
     ];
 
     view! {
@@ -277,7 +277,7 @@ fn Privacy() -> impl IntoView {
                         <span class="node node--out mono">"audio"</span>
                     </div>
                     <div class="boundary__net mono muted">
-                        "network: model download only"
+                        "network: assets, updates & support — never selected text"
                     </div>
                 </figure>
             </div>
@@ -300,7 +300,7 @@ fn Performance() -> impl IntoView {
                 <p class="eyebrow">"Fast, and real speech"</p>
                 <h2>"Latency you can live with."</h2>
                 <p class="band__sub">
-                    "Kokoro brings 54 natural voices across nine languages; Soprano is a lean, English, low-latency reader. Both stay warm so the second read is instant."
+                    "Kokoro brings 54 natural voices across nine languages; Soprano is a lean, English, low-latency reader. Both stay warm so later reads do not reload the model."
                 </p>
             </header>
             <div class="metrics">

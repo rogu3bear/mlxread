@@ -2,7 +2,7 @@
 
 The public product, first-read, privacy, FAQ, and support experience for
 [MLXRead](../README.md). It is a Leptos 0.8 application with edge SSR,
-progressive router navigation, and one hydrated home-page demo.
+progressive router navigation, and one hydrated read-lifecycle interaction.
 
 ## Product routes
 

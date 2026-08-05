@@ -69,6 +69,11 @@ a {
   color: var(--ink);
 }
 
+:where(a, button, summary, input, select, textarea):focus-visible {
+  outline: 2px solid var(--amber-bright);
+  outline-offset: 3px;
+}
+
 button {
   font: inherit;
 }
@@ -213,6 +218,56 @@ button {
 .nav__link--cta:hover {
   border-color: var(--amber);
   background: var(--amber-soft);
+  color: var(--amber);
+}
+.nav-menu {
+  display: none;
+  position: relative;
+}
+.nav-menu__trigger {
+  padding: 8px 12px;
+  border: 1px solid var(--line-2);
+  border-radius: var(--r-xs);
+  color: var(--ink-2);
+  cursor: pointer;
+  list-style: none;
+  font-size: 0.92rem;
+}
+.nav-menu__trigger::-webkit-details-marker {
+  display: none;
+}
+.nav-menu__trigger::after {
+  content: " +";
+  color: var(--amber);
+}
+.nav-menu[open] .nav-menu__trigger::after {
+  content: " −";
+}
+.nav-menu__panel {
+  position: absolute;
+  top: calc(100% + 10px);
+  right: 0;
+  min-width: min(76vw, 240px);
+  padding: 8px;
+  display: grid;
+  gap: 3px;
+  border: 1px solid var(--line-2);
+  border-radius: var(--r-sm);
+  background: var(--bg-1);
+  box-shadow: var(--shadow);
+}
+.nav-menu__link {
+  padding: 10px 12px;
+  border-radius: var(--r-xs);
+  color: var(--ink-2);
+  text-decoration: none;
+}
+.nav-menu__link:hover,
+.nav-menu__link[aria-current="page"] {
+  color: var(--ink);
+  background: var(--bg-2);
+}
+.nav-menu__link--cta {
   color: var(--amber);
 }
 
@@ -668,6 +723,9 @@ button {
   flex-direction: column;
   gap: 14px;
 }
+.install__get > .btn {
+  align-self: flex-start;
+}
 .install__hint {
   font-size: 0.8rem;
   line-height: 1.6;
@@ -699,6 +757,9 @@ button {
 .install__notes {
   display: grid;
   gap: 18px;
+}
+.install__notes > .btn {
+  justify-self: start;
 }
 .note h3 {
   font-size: 1rem;
@@ -1326,8 +1387,11 @@ select.field__input {
   }
 }
 @media (max-width: 560px) {
-  .nav__link:not(.nav__link--cta) {
+  .nav {
     display: none;
+  }
+  .nav-menu {
+    display: block;
   }
   .metrics {
     grid-template-columns: 1fr;

@@ -5,7 +5,7 @@ A local, private replacement for macOS "Speak Selection": press **⌥⎋
 text-to-speech model running entirely on your Mac. Press ⌥⎋ again and it
 stops instantly.
 
-**[Download the latest release](https://github.com/rogu3bear/mlxread/releases/latest)** (Developer ID–signed `.app`, macOS 14+ · Apple Silicon) · **Website & demo:** [mlxread-web.pages.dev](https://mlxread-web.pages.dev)
+**[Download the latest release](https://github.com/rogu3bear/mlxread/releases/latest)** (Developer ID–signed `.app`, macOS 14+ · Apple Silicon) · **Product website:** [mlxread-web.pages.dev](https://mlxread-web.pages.dev)
 
 - Menu-bar utility (no Dock icon), SwiftUI + AppKit at the edges; optional
   **launch at login** keeps it always on, a keystroke away
@@ -133,8 +133,8 @@ Status and evidence: [docs/system-voice-provider.md](docs/system-voice-provider.
 
 ## Website
 
-A marketing + demo site lives in [`website/`](website/) — Leptos SSR with an
-interactive ⌥⎋ demo, deployed to Cloudflare Pages at
+A product and first-read site lives in [`website/`](website/) — Leptos SSR with
+an interactive ⌥⎋ read-lifecycle preview, deployed to Cloudflare Pages at
 **https://mlxread-web.pages.dev**. It also hosts the
 [FAQ](https://mlxread-web.pages.dev/faq) and a
 [Support](https://mlxread-web.pages.dev/support) page with a contact form.

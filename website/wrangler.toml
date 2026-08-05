@@ -10,4 +10,4 @@ command = "bash ./scripts/build-edge.sh"
 directory = "./target/site"
 binding = "ASSETS"
 
-# No D1 / data layer: MLXRead's site is a static marketing + demo surface.
+# No D1 / data layer: MLXRead's product site keeps no account or session state.

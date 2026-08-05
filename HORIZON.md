@@ -8,9 +8,11 @@ This horizon governs a bounded production refactor of the MLXRead website. The
 outcome is to move a qualified Apple Silicon Mac user from initial interest to
 a successful first local read without changing the native application or its
 published release. The job is activation and trustworthy delivery, not feature
-expansion. `NORTH_STAR.md:1` was inspected as local design context; it describes
-the inherited starter rather than the MLXRead product and is excluded as a
-product authority. Product truth comes from the root README, native source,
+expansion. At the implementation baseline, `NORTH_STAR.md:1` described the
+inherited starter rather than the MLXRead product and was excluded as product
+authority. A later product-specific local version is gitignored and therefore
+remains informative rather than canonical until it is deliberately reconciled.
+Product truth comes from this tracked HORIZON, the root README, native source,
 release assets, and existing product-specific web pages.
 
 ## Semantic Product Contract
@@ -137,6 +139,12 @@ Shared component and token mapping remains source-owned. Existing `.btn`,
 `OptEsc`, and route metadata patterns are reused. New setup-specific classes
 may compose those shared tokens but must not establish a parallel theme.
 
+The de-template peer audit maps actions to `.btn`, section rhythm to `.band`,
+technical labels to `.eyebrow`/`.mono`, and window-like surfaces to the existing
+framed panel/titlebar rules. Steps and metrics share border tokens but retain
+separate structures because their semantics, density, and responsive columns
+differ. No generic card component or wider hydration boundary is admitted.
+
 ## Leptos Delivery Map
 
 `App` owns the Router, route list, metadata context, and not-found response.
@@ -159,9 +167,11 @@ becomes disputed, that dev-only route is the reversible place to compare ideas.
 Wide layouts may use three prerequisite columns and a split recovery section.
 Narrow layouts collapse to one column without changing DOM order. Router links
 must retain visible keyboard focus, `aria-current`, and semantic anchor
-behavior. The skip link targets the shared main-content boundary. Reduced
-motion disables entrance and demo motion. Text must remain selectable, zoomable,
-and usable without JavaScript.
+behavior. On narrow screens, a native `details` disclosure keeps every primary
+route discoverable without JavaScript while preserving the compact header. The
+skip link targets the shared main-content boundary. Reduced motion disables
+entrance and demo motion. Text must remain selectable, zoomable, and usable
+without JavaScript.
 
 ## Comparison and Proof Plan
 
@@ -191,3 +201,19 @@ back from `https://mlxread.com`.
 - ICE and MoSCoW rank runtime/router correctness, canonical first-read flow,
   and domain release ahead of copy polish or native feature expansion.
 - Direction B is implemented with source, runtime, and rendered evidence.
+- De-template recovery retained the selected product direction, removed visible
+  framework/hosting attribution, restored narrow route discovery, normalized
+  focus-visible treatment, and rejected an evidence-free generic card layer.
+- Recovery captures are bound to SHA-256
+  `b9dde4be789609008aa5c43384afb57c130deb88532282bbe7d0f509a6d3d1ec`
+  (wide home) and
+  `fe8d25dfc33ba9906cbd4b0c0e2ce1d96cd8dc7e39b495d4afc6742339650cad`
+  (narrow home). Their stitched repetition is not treated as runtime evidence;
+  DOM counts and route checks are the adjudicating proof.
+- Post-refactor viewport captures are SHA-256
+  `0a70fb4fee870ae7cab88e1def56f794bd7b8185fcf887b1eb395d41337e9d5d`
+  (wide home) and
+  `48134a867f3bc4c8dddfd9cd7eac0c690eb3907327d164cb178d6a2c416789b3`
+  (390 px home with the navigation disclosure open). Browser evidence records
+  one hero at 320 px, no horizontal overflow, all five navigation targets,
+  visible summary focus, and no page warnings or errors.

@@ -25,6 +25,18 @@ pub fn AppLayout(children: Children) -> impl IntoView {
                     <A href="/support" attr:class="nav__link">"Support"</A>
                     <A href="/get-started" attr:class="nav__link nav__link--cta">"Get started"</A>
                 </nav>
+                <details class="nav-menu">
+                    <summary class="nav-menu__trigger">"Menu"</summary>
+                    <nav class="nav-menu__panel" aria-label="Primary navigation on small screens">
+                        <a class="nav-menu__link" href="/#how">"How it works"</a>
+                        <A href="/privacy" attr:class="nav-menu__link">"Privacy"</A>
+                        <A href="/faq" attr:class="nav-menu__link">"FAQ"</A>
+                        <A href="/support" attr:class="nav-menu__link">"Support"</A>
+                        <A href="/get-started" attr:class="nav-menu__link nav-menu__link--cta">
+                            "Get started"
+                        </A>
+                    </nav>
+                </details>
             </div>
         </header>
 
@@ -57,7 +69,7 @@ pub fn AppLayout(children: Children) -> impl IntoView {
                         " · "
                         <a href=AUTHOR_GITHUB rel="noopener" target="_blank">"github.com/rogu3bear"</a>
                     </span>
-                    <span>"Built with Leptos, served from Cloudflare."</span>
+                    <span>"Signed app · local speech · open source"</span>
                 </div>
             </div>
         </footer>

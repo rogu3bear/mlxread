@@ -1,9 +1,9 @@
 use axum::extract::FromRef;
 use leptos::prelude::LeptosOptions;
 
-/// Application state shared with Leptos SSR. The MLXRead site is a static
-/// marketing/demo surface with no data layer and no sessions, so this carries
-/// only what the framework needs. The edge handler keeps the security headers
+/// Application state shared with Leptos SSR. The MLXRead product site has no
+/// data layer or sessions, so this carries only what the framework needs. The
+/// edge handler keeps the security headers
 /// (CSP, X-Frame-Options, nosniff) but sets no cookies.
 #[derive(Clone)]
 pub struct AppState {

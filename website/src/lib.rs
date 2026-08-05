@@ -47,7 +47,7 @@ async fn fetch(
     if server_fn_body_too_large(&req) {
         let mut response = Response::builder()
             .status(StatusCode::PAYLOAD_TOO_LARGE)
-            .body(Body::from("Request payload exceeds the demo limit."))
+            .body(Body::from("Request payload exceeds the accepted limit."))
             .map_err(|error| worker::Error::RustError(error.to_string()))?;
         apply_response_headers(
             &mut response,

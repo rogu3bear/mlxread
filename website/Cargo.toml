@@ -3,7 +3,7 @@ name = "mlxread-web"
 version = "0.1.0"
 edition = "2021"
 license = "MIT"
-description = "Marketing + demo site for MLXRead — Leptos SSR on Cloudflare Workers."
+description = "Product and first-read site for MLXRead — Leptos SSR on Cloudflare Workers."
 
 [profile.release]
 opt-level = "s"
