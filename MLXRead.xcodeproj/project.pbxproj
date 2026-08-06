@@ -499,9 +499,9 @@
 			projectRoot = "";
 			targets = (
 				B9B72E8AE94ADB9CF01D5752 /* MLXRead */,
+				57B30F0AB4DC783693F260D9 /* SystemVoiceProvider */,
 				7DB531FB48F4F57EFBEE7E5E /* MLXReadTests */,
 				8D5844F7A5B781BE297548C6 /* MLXReadUITests */,
-				57B30F0AB4DC783693F260D9 /* SystemVoiceProvider */,
 			);
 		};
 /* End PBXProject section */
