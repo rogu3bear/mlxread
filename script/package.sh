@@ -1,5 +1,5 @@
 #!/bin/bash
-# Produce a distributable build at dist/MLXRead.app (+ dist/MLXRead.zip).
+# Produce dist/MLXRead.app, the Sparkle archive, and the manual-install DMG.
 #
 # Signing is controlled by env passthrough. For a PUBLIC release, sign with a
 # Developer ID identity (+ the hardened runtime the Release config already
@@ -82,5 +82,8 @@ rm -f dist/MLXRead.zip
 ditto -c -k --keepParent dist/MLXRead.app dist/MLXRead.zip
 echo "    dist/MLXRead.zip ($(du -h dist/MLXRead.zip | cut -f1))"
 
+echo "==> Building installer image"
+bash script/create-dmg.sh dist/MLXRead.app dist/MLXRead.dmg
+
 echo
-echo "Packaged: dist/MLXRead.app + dist/MLXRead.zip"
+echo "Packaged: dist/MLXRead.app + dist/MLXRead.zip + dist/MLXRead.dmg"

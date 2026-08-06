@@ -34,7 +34,7 @@ pub fn GetStartedPage() -> impl IntoView {
                         <A href="/faq" attr:class="btn btn--ghost">"Read the FAQ"</A>
                     </div>
                     <p class="hero__foot mono muted">
-                        "Signed & notarized · macOS 14+ · Apple Silicon · ~26 MB app download"
+                        "Signed & notarized · macOS 14+ · Apple Silicon · ~30 MB DMG"
                     </p>
                 </header>
 
@@ -59,7 +59,7 @@ pub fn GetStartedPage() -> impl IntoView {
                     <h2 id="install-steps">"Install and hear your first selection"</h2>
                     <ol class="start-steps">
                         <StartStep number="01" title="Put MLXRead in Applications">
-                            "Open the downloaded ZIP, then drag MLXRead.app into Applications and launch it. The release is Developer ID–signed and notarized by Apple."
+                            "Open the downloaded DMG, drag MLXRead into Applications, eject the installer, and launch the app. Both the installer and app are Developer ID–signed and notarized by Apple."
                         </StartStep>
                         <StartStep number="02" title="Grant Accessibility access">
                             "When macOS opens Privacy & Security → Accessibility, enable MLXRead. This permission lets the app receive the global shortcut and read the selection from the frontmost app. It does not grant network access."

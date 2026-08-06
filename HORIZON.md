@@ -183,9 +183,19 @@ tree. Run the Pages package locally and inspect `/`, `/get-started`, `/faq`,
 review covers wide and narrow rendering, keyboard focus, and overflow. Deploy,
 domain attachment, and live readback remain separate proof gates.
 
+## Production-readiness amendment
+
+The manual download contract is `MLXRead.dmg`, with an Applications shortcut in
+the mounted image and explicit drag-to-install guidance. `MLXRead.zip` remains a
+separate compatibility consumer for Sparkle updates. Because every website
+route is synchronous, Leptos Router uses complete-document `SsrMode::Async`
+responses rather than out-of-order suspended-fragment streaming. Leptos still
+emits two deterministic empty resource-state scripts; the release CSP permits
+only their exact hashes alongside the exact hydration-script hash.
+
 ## Non-goals and Reversibility
 
-There is no native feature work, release recut, analytics, account system, D1,
+There is no native feature work, analytics, account system, D1,
 Durable Object, realtime transport, or new telemetry. `/get-started` can be
 removed without data migration. Router-aware links degrade to standard anchors.
 The Pages URL remains available during domain cutover. No custom-domain claim

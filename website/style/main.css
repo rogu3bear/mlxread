@@ -26,7 +26,10 @@
   --r: 12px;
   --r-sm: 8px;
   --r-xs: 6px;
-  --maxw: 1080px;
+  --page-max-inline: 1280px;
+  --page-gutter: clamp(20px, 3vw, 40px);
+  --section-space-block: clamp(68px, 7vw, 108px);
+  --feature-gap: clamp(40px, 4vw, 72px);
   --shadow: 0 24px 70px rgba(0, 0, 0, 0.5);
 }
 
@@ -163,9 +166,10 @@ button {
   backdrop-filter: blur(14px);
 }
 .topbar__inner {
-  max-width: var(--maxw);
+  max-inline-size: var(--page-max-inline);
   margin: 0 auto;
-  padding: 14px 24px;
+  padding-block: 14px;
+  padding-inline: var(--page-gutter);
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -273,9 +277,10 @@ button {
 
 /* ---- Section rhythm ---- */
 .band {
-  max-width: var(--maxw);
+  max-inline-size: var(--page-max-inline);
   margin: 0 auto;
-  padding: 92px 24px;
+  padding-block: var(--section-space-block);
+  padding-inline: var(--page-gutter);
   border-top: 1px solid var(--line);
 }
 .band--edge {
@@ -300,12 +305,13 @@ button {
 
 /* ---- Hero ---- */
 .hero {
-  max-width: var(--maxw);
+  max-inline-size: var(--page-max-inline);
   margin: 0 auto;
-  padding: 72px 24px 84px;
+  padding-block: clamp(52px, 6vw, 88px) clamp(68px, 7vw, 100px);
+  padding-inline: var(--page-gutter);
   display: grid;
   grid-template-columns: minmax(0, 1.05fr) minmax(360px, 0.95fr);
-  gap: 52px;
+  gap: var(--feature-gap);
   align-items: center;
 }
 .hero__copy h1 {
@@ -718,6 +724,9 @@ button {
   gap: 32px;
   align-items: start;
 }
+.install > * {
+  min-inline-size: 0;
+}
 .install__get {
   display: flex;
   flex-direction: column;
@@ -777,13 +786,16 @@ button {
   background: var(--bg-2);
   border: 1px solid var(--line);
   color: var(--amber);
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 /* ---- CTA + footer + 404 ---- */
 .cta {
-  max-width: var(--maxw);
+  max-inline-size: var(--page-max-inline);
   margin: 0 auto;
-  padding: 100px 24px 110px;
+  padding-block: clamp(84px, 8vw, 116px) clamp(92px, 9vw, 128px);
+  padding-inline: var(--page-gutter);
   text-align: center;
   border-top: 1px solid var(--line);
 }
@@ -803,9 +815,10 @@ button {
   background: var(--bg-1);
 }
 .footer__inner {
-  max-width: var(--maxw);
+  max-inline-size: var(--page-max-inline);
   margin: 0 auto;
-  padding: 40px 24px;
+  padding-block: 40px;
+  padding-inline: var(--page-gutter);
   display: flex;
   flex-direction: column;
   gap: 14px;
@@ -860,7 +873,7 @@ button {
 
 /* ---- Legal pages ---- */
 .legal {
-  max-width: 760px;
+  max-width: 820px;
 }
 .legal h1 {
   font-size: clamp(2rem, 3.4vw, 2.8rem);
@@ -910,9 +923,10 @@ button {
 }
 
 .notfound {
-  max-width: var(--maxw);
+  max-inline-size: var(--page-max-inline);
   margin: 0 auto;
-  padding: 140px 24px;
+  padding-block: 140px;
+  padding-inline: var(--page-gutter);
   text-align: center;
   display: grid;
   gap: 18px;
@@ -924,10 +938,10 @@ button {
 
 /* ---- First-read journey ---- */
 .start {
-  max-width: 920px;
+  max-width: 1040px;
 }
 .start__hero {
-  max-width: 720px;
+  max-width: 760px;
   padding-bottom: 64px;
 }
 .start__hero h1 {
@@ -1007,7 +1021,7 @@ button {
 
 /* ---- FAQ ---- */
 .faq {
-  max-width: 820px;
+  max-width: 960px;
 }
 .faq__list {
   margin-top: 28px;
@@ -1112,7 +1126,7 @@ button {
 
 /* ---- Support ---- */
 .support {
-  max-width: 860px;
+  max-width: 1040px;
 }
 .support__section {
   margin-top: 42px;
@@ -1245,7 +1259,7 @@ button {
   margin-top: 22px;
   display: grid;
   gap: 16px;
-  max-width: 620px;
+  max-width: 720px;
 }
 .contact__row {
   display: grid;
@@ -1355,6 +1369,15 @@ select.field__input {
 }
 
 /* ---- Responsive ---- */
+@media (max-width: 760px) {
+  .nav {
+    display: none;
+  }
+  .nav-menu {
+    display: block;
+  }
+}
+
 @media (max-width: 900px) {
   .hero {
     grid-template-columns: 1fr;
@@ -1363,7 +1386,7 @@ select.field__input {
   }
   .privacy,
   .install {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
   }
   .steps {
     grid-template-columns: 1fr;
@@ -1383,16 +1406,10 @@ select.field__input {
     flex-wrap: wrap;
   }
   .band {
-    padding: 68px 20px;
+    padding-block: 68px;
   }
 }
 @media (max-width: 560px) {
-  .nav {
-    display: none;
-  }
-  .nav-menu {
-    display: block;
-  }
   .metrics {
     grid-template-columns: 1fr;
   }

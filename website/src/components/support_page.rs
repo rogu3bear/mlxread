@@ -61,7 +61,7 @@ pub fn SupportPage() -> impl IntoView {
                             "Check the selected output device. The app reports \"audio device unavailable\" if the engine can't start — switch devices and try again."
                         </Trouble>
                         <Trouble title="Gatekeeper warning">
-                            "You shouldn't see one — the release is notarized. If you do, you likely have an old build; download the latest and replace it."
+                            "A normal first-open confirmation is expected for an internet download. If macOS says it cannot verify the developer or blocks the app, replace it with the latest DMG release."
                         </Trouble>
                     </div>
                 </section>

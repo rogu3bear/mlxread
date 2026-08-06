@@ -1,6 +1,6 @@
 # MLXRead Website Delivery Authority
 
-Status: delivery candidate, awaiting security-owner confirmation and production readback
+Status: release candidate, awaiting exact-tree proof, merge, deployment, and production readback
 
 Scope: public website, first-read journey, Cloudflare Pages release, and `mlxread.com` cutover
 
@@ -90,8 +90,8 @@ Mode: feature-change review of “further visual redesign before production.”
 |---|---|---|---|
 | Demand/fit: another beauty pass may solve no observed visitor problem | no visitor research or analytics; current rendered surface is coherent and product-specific | medium | build small: ship correctness and trust fixes only |
 | Trust: absolute network and speed copy can exceed actual behavior | source includes updates, pronunciation assets, support network use, and model-specific timing | high | qualify claims before deploy |
-| Release: Pages upload/domain mutations were not executable through the required control plane | cfctl catalog blocker reproduced | high | repair exact cfctl contracts and prove them independently |
-| Security: website, support worker, update path, and local app boundaries need owner confirmation | existing policy/threat model exists but predates canonical-domain cutover | medium | confirm assumptions before policy/threat-model edits |
+| Release: Pages upload/domain mutations previously lacked an executable required control-plane contract | cfctl catalog blocker was reproduced; current contracts are ready | high | retain cfctl plan/apply/readback proof as the release gate |
+| Security: website, support worker, update path, and local app boundaries required owner confirmation | operator approved the bounded production pass; policy and threat model now cover canonical-domain and DMG/ZIP boundaries | medium | verify the approved source diff before merge |
 | Measurement: a launch can be “green” while first-read friction remains unknown | no product analytics or moderated study | high | schedule five post-launch observations |
 
 Verdict: **build small and release**. Further visual polish is demand level L0/L1; the domain and deployment path are release necessities.
@@ -138,6 +138,7 @@ All behavior and emotion below is a low-confidence hypothesis until moderated re
 - Given client-side navigation, when a visitor uses route links and browser back/forward, then Leptos Router preserves the expected URL, title, focus-visible controls, and content.
 - Given a visitor without JavaScript, when they open product, get-started, FAQ, support, privacy, or terms, then the essential content and recovery path remain available.
 - Given the home page, when privacy and performance claims render, then selected-text behavior is distinguished from asset, update, and support network traffic, and measured latency is model/warm-state qualified.
+- Given a person selecting the public macOS download, when they follow the primary release action, then they receive `MLXRead.dmg`; Sparkle continues to receive the separately signed `MLXRead.zip` update archive.
 - Given a narrow viewport at 390 CSS pixels and a desktop viewport at 1440 CSS pixels, when pages render, then no horizontal overflow, clipped action, or unreachable navigation is present.
 - Given a keyboard-only visitor, when they traverse navigation, demo controls, forms, and links, then focus is visible, order is logical, landmarks/headings are coherent, and interactive elements have accessible names.
 - Given support submission, when the request is cross-origin or exceeds the body limit, then it is rejected without forwarding; same-origin valid requests receive private, non-cacheable handling.
@@ -164,9 +165,9 @@ Launch type: public website production cutover. Target: first day after all bloc
 - [x] De-templated visual and tracked product doctrine present.
 - [x] Material network/performance copy corrected in source.
 - [x] Exact cfctl Pages/domain contracts locally verified against the current schema.
-- [ ] Security assumptions confirmed by the operator.
-- [ ] Exact security-policy diff approved before write.
-- [ ] Threat model refreshed after assumption confirmation.
+- [x] Security assumptions confirmed by the operator.
+- [x] Exact security-policy diff approved before write.
+- [x] Threat model refreshed after assumption confirmation.
 - [ ] Website full release gate passes on the final committed source tree.
 - [ ] Release source committed and available on the intended branch.
 - [ ] Pages artifact plan reviewed and approved by exact operation ID.

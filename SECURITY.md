@@ -63,9 +63,10 @@ remain in scope.
   by random 128-bit identifiers and returned with `private, no-store`; anyone
   who obtains a download URL can read that bundle. Retention and authenticated
   maintainer access are tracked limitations, not protections that exist today.
-- **Release artifacts are signed.** Public artifacts must be Developer
-  ID-signed, hardened, notarized, and stapled. Debug builds deliberately have a
-  weaker debugger posture and are not release artifacts.
+- **Release artifacts are signed.** The manual-install DMG and its contained
+  app must be Developer ID-signed, hardened, notarized, and stapled. The ZIP is
+  retained as the separately verified Sparkle update archive. Debug builds
+  deliberately have a weaker debugger posture and are not release artifacts.
 - **Updates fail closed when unconfigured.** Sparkle starts only with a real
   HTTPS feed and non-placeholder public key, then verifies EdDSA signatures.
   The checked-in feed and project settings remain templates, so source builds

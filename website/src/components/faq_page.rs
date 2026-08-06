@@ -81,7 +81,7 @@ pub fn FaqPage() -> impl IntoView {
                         <p>
                             "The release is Developer ID–signed, runs under the hardened runtime, and is "
                             <b>"notarized by Apple"</b>
-                            " — so it opens without a Gatekeeper warning. Unzip it, drag it to Applications, and open it."
+                            ". Open the DMG, drag MLXRead to Applications, eject the installer, and launch it. macOS may show its normal first-open confirmation for an internet download, but it should not block the app as an unidentified developer."
                         </p>
                     </Faq>
 
