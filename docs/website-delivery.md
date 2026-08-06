@@ -1,14 +1,14 @@
 # MLXRead Website Delivery Authority
 
-Status: release candidate, awaiting exact-tree proof, merge, deployment, and production readback
+Status: production live; post-launch first-read research remains
 
-Scope: public website, first-read journey, Cloudflare Pages release, and `mlxread.com` cutover
+Scope: public website, first-read journey, Cloudflare Worker release, and `mlxread.com` cutover
 
 Evidence mode: product-source inference; no customer interviews, analytics, or completed OKR cycle
 
 ## Decision
 
-Ship the existing focused Leptos website after truth, security, and release gates. Do not spend the launch window on another broad visual redesign. The binding constraint is the governed Cloudflare Pages upload and domain lifecycle, not interface quality.
+Ship the existing focused Leptos website after truth, security, and release gates. Do not spend the launch window on another broad visual redesign. The binding constraint is the governed Cloudflare Worker deployment and custom-domain lifecycle, not interface quality.
 
 The full five-day design sprint is not ready or proportionate: the challenge is already implemented, no decider/roster calendar is committed, and five target users have not been recruited. Replace it with five moderated download-to-first-read observations after launch.
 
@@ -77,7 +77,7 @@ Objective: Make MLXRead’s public path a trustworthy bridge from curiosity to a
 | Qualified visitors who reach `/get-started` after viewing product or privacy evidence | unknown | establish baseline for the first 30 days | not instrumented |
 | Moderated target users who complete download-to-first-read without facilitator correction | unknown | at least 4 of 5 | research not recruited |
 | First-read participants who can correctly explain whether selected text leaves the Mac | unknown | 5 of 5 | research not recruited |
-| Canonical route contract passing on `mlxread.com` for all documented routes, 404 behavior, TLS, and security/cache headers | 0 live canonical routes | 100% at launch | release gate |
+| Canonical route contract passing on `mlxread.com` for all documented routes, 404 behavior, TLS, and security/cache headers | 0 live canonical routes | 100% at launch | passed 2026-08-06 |
 | Material privacy or distribution claims contradicted by source behavior | at least 1 pre-launch overstatement found | 0 at launch | source review gate |
 
 The objective is empowering, but empowerment evidence is not yet observable. The OKR grader therefore returns **not gradable** rather than inventing a score: the cycle has not run, baselines are absent, and three outcome KRs require research or instrumentation. The route and claim KRs are launch gates, not proof of customer outcome.
@@ -90,7 +90,7 @@ Mode: feature-change review of “further visual redesign before production.”
 |---|---|---|---|
 | Demand/fit: another beauty pass may solve no observed visitor problem | no visitor research or analytics; current rendered surface is coherent and product-specific | medium | build small: ship correctness and trust fixes only |
 | Trust: absolute network and speed copy can exceed actual behavior | source includes updates, pronunciation assets, support network use, and model-specific timing | high | qualify claims before deploy |
-| Release: Pages upload/domain mutations previously lacked an executable required control-plane contract | cfctl catalog blocker was reproduced; current contracts are ready | high | retain cfctl plan/apply/readback proof as the release gate |
+| Release: Worker deployment/domain mutations previously lacked an executable required control-plane contract | cfctl catalog blocker was reproduced; the `wrangler.deploy` contract is now executable | high | retain cfctl plan/apply/readback proof as the release gate |
 | Security: website, support worker, update path, and local app boundaries required owner confirmation | operator approved the bounded production pass; policy and threat model now cover canonical-domain and DMG/ZIP boundaries | medium | verify the approved source diff before merge |
 | Measurement: a launch can be “green” while first-read friction remains unknown | no product analytics or moderated study | high | schedule five post-launch observations |
 
@@ -98,15 +98,15 @@ Verdict: **build small and release**. Further visual polish is demand level L0/L
 
 ## Prioritized action plan
 
-Cynefin domain: complicated. Complexity: medium-high. Binding constraint: cfctl’s previously incomplete Pages upload/domain contracts.
+Cynefin domain: complicated. Complexity: medium-high. Binding constraint: cfctl’s previously incomplete Worker deployment/domain contracts.
 
 | Priority | Action | Owner | Proof | Stop condition |
 |---|---|---|---|---|
-| P1 | Close and verify exact cfctl Pages upload/domain contracts | control-plane lane | `cargo xtask verify`, live-schema catalog read | both capabilities executable with exact verification |
+| P1 | Close and verify the exact cfctl Worker deployment/domain contract | control-plane lane | live-schema catalog read and generated guide | `wrangler.deploy` is executable with exact verification |
 | P2 | Correct overbroad claims and tracked template doctrine | website lane | source diff, tests, rendered review | no known contradictory material claim or starter authority remains tracked |
 | P3 | Confirm security assumptions; update policy/threat model only after owner approval | operator + website lane | approved diff and repository-grounded model | trust boundaries and reportable issues are explicit |
-| P4 | Run exact-tree website release gate and build Pages artifact | website lane | `website/scripts/verify.sh`, artifact manifest | exact committed source SHA has a fresh passing artifact |
-| P5 | Plan, approve, and run Pages upload and domain attachment through cfctl | operator authority + control plane | plan IDs, apply receipts, post-change verification | exact SHA is production and domain resource exists |
+| P4 | Run exact-tree website release gate and build the Worker/assets artifact | website lane | `website/scripts/verify.sh`, artifact manifest | exact committed source SHA has a fresh passing artifact |
+| P5 | Plan, approve, and run Worker deployment and domain attachment through cfctl | operator authority + control plane | operation ID, apply receipt, post-change verification | exact config is deployed and the domain resource exists |
 | P6 | Prove canonical runtime contract | website lane | DNS/TLS, route/status/content/header readback | `mlxread.com` passes every acceptance criterion |
 | P7 | Observe five first-read journeys and grade the OKR when actuals exist | product lane | research notes and KR actuals | evidence supports retain/refine decision |
 
@@ -116,7 +116,7 @@ Cynefin domain: complicated. Complexity: medium-high. Binding constraint: cfctl�
 2. As a new user, I want one ordered path from download through the first read so I do not have to infer macOS permissions, model choice, or shortcut behavior.
 3. As a visitor following a deep link, I want every documented route to render directly and preserve meaningful browser navigation so the website behaves like a real multipage product surface.
 4. As a blocked user, I want FAQ and support recovery that works without JavaScript so setup failure does not become abandonment.
-5. As the release operator, I want the exact source SHA bound to the Pages deployment and custom domain so command success cannot be mistaken for production proof.
+5. As the release operator, I want the exact source SHA bound to the Worker deployment and custom domain so command success cannot be mistaken for production proof.
 
 ## Hypothesis journey map
 
@@ -143,8 +143,24 @@ All behavior and emotion below is a low-confidence hypothesis until moderated re
 - Given a keyboard-only visitor, when they traverse navigation, demo controls, forms, and links, then focus is visible, order is logical, landmarks/headings are coherent, and interactive elements have accessible names.
 - Given support submission, when the request is cross-origin or exceeds the body limit, then it is rejected without forwarding; same-origin valid requests receive private, non-cacheable handling.
 - Given immutable hashed assets, when requested, then they receive immutable caching; documents revalidate; API responses are private and `no-store`.
-- Given the reviewed release source SHA, when cfctl completes the Pages plan, then the production deployment readback reports the exact project, branch, SHA, and successful stage.
-- Given `mlxread.com`, when DNS and TLS converge, then all route/status/content/header checks pass on the canonical host and no release claim relies only on the Pages resource receipt.
+- Given the reviewed release source SHA, when cfctl completes the Worker plan, then the plan pins its clean source config and the post-change verification reports the promoted production version.
+- Given `mlxread.com`, when DNS and TLS converge, then all route/status/content/header checks pass on the canonical host and no release claim relies only on the Worker resource receipt.
+
+## Production receipt
+
+Evidence is separated by plane; a later plane does not retroactively replace an earlier one.
+
+| Plane | Evidence | State |
+|---|---|---|
+| Source | App/site release merge `3913c63f5336c05b4bf7589efc24f0def6876dc3`; custom-domain merge `dc8185ae2297e2c01684e8327cc73d612d406c07` | merged on `origin/main` |
+| Exact-tree website proof | `website/scripts/verify.sh` passed on clean `dc8185ae`: formatting, SSR compile, full edge build, hash/runtime verifiers, and Wrangler dry-run | passed |
+| macOS distribution | `MLXRead.dmg` SHA-256 `7cefd56ecb8ab08c685fff81859f3df74a30a686a117b148e402aa7da6f5a6b4`; `MLXRead.zip` SHA-256 `393be345d6d2d9ace3e0278ab7fc1708221eb5714232c9048aca1908efbd51d9` | GitHub release assets match local artifacts |
+| Apple trust | DMG notary submission `83715387-9ff5-4f1e-978e-58b46bde50ac`; ZIP notary submission `072aec64-a89d-4f7d-98bb-7aa203398f45`; stapler, Gatekeeper, and deep mounted-app signature validation passed | accepted as Notarized Developer ID |
+| Cloudflare plan/apply | cfctl operation `4bf6fbc5-e275-4c84-a3a5-25a3902d73f3`; apply evidence `sha256:6321a7923e6c3513942298f135c2cadb2c4f68295dd9271d08a1287e4fe55474`; verification evidence `sha256:520033521766ad26924cb1bbe1606da276d365e08be5151a6d4fc6b86580ace9` | closed and verified |
+| Worker | `mlxread-web` production version `6066e27a-c93b-4841-bebe-c2b1216085a1` | promoted |
+| Custom domain | Domain `e398152b594c47fd0f49e8d5cdf7c88855a993bb`, certificate `b9398572-d3bb-4417-9c07-326558bdfcff`, active zone `bee24ad67b4c155b9be27d4596f41bab`; Cloudflare and Google public DNS-over-HTTPS returned apex addresses `104.21.67.142` and `172.67.177.59` | enabled and publicly resolved |
+| Edge runtime | Canonical TLS reads using public DNS-over-HTTPS returned the site without a fixed-IP override; six canonical routes returned 200, the unknown route returned 404, all three inline script hashes matched CSP, documents revalidated, and hashed CSS/JS/WASM returned immutable caching | passed |
+| Rollback | Prior known-good Worker version `2bc3dcd4-01be-435d-8749-0104b34bbdd6`; rollback requires a new reviewed cfctl plan | identified, not exercised |
 
 ## Design-sprint readiness
 
@@ -159,22 +175,22 @@ Decision: **wait / do not schedule the five-day sprint**.
 
 ## Launch checklist
 
-Launch type: public website production cutover. Target: first day after all blockers close.
+Launch type: public website production cutover. Completed: 2026-08-06.
 
 - [x] Product routes and router fallback implemented.
 - [x] De-templated visual and tracked product doctrine present.
 - [x] Material network/performance copy corrected in source.
-- [x] Exact cfctl Pages/domain contracts locally verified against the current schema.
+- [x] Exact cfctl Worker/domain contract locally verified against the current schema.
 - [x] Security assumptions confirmed by the operator.
 - [x] Exact security-policy diff approved before write.
 - [x] Threat model refreshed after assumption confirmation.
-- [ ] Website full release gate passes on the final committed source tree.
-- [ ] Release source committed and available on the intended branch.
-- [ ] Pages artifact plan reviewed and approved by exact operation ID.
-- [ ] Pages apply and exact-SHA production readback pass.
-- [ ] Custom-domain plan reviewed and approved by exact operation ID.
-- [ ] Domain resource readback, DNS, TLS, canonical routes, 404, content, and headers pass.
-- [ ] Rollback target identified as a known prior deployment/artifact; any rollback remains a separate reviewed plan.
-- [ ] Five moderated first-read observations scheduled; OKR grading deferred until actuals exist.
+- [x] Website full release gate passes on the final committed source tree.
+- [x] Release source is committed and available on `origin/main`.
+- [x] Worker deployment plan reviewed and approved by exact operation ID.
+- [x] Worker apply and promoted-version readback pass.
+- [x] Custom-domain declaration reviewed, merged, and applied by the same exact deployment operation.
+- [x] Domain resource readback, DNS, TLS, canonical routes, 404, content, and headers pass.
+- [x] Rollback target identified as a known prior deployment/artifact; any rollback remains a separate reviewed plan.
+- [ ] Post-launch: recruit and observe five moderated first-read journeys; OKR grading remains deferred until actuals exist.
 
-Go/no-go: no-go while any unchecked security, exact-tree, control-plane, or live-host item remains. A local build, resource creation receipt, or Pages URL alone is not launch completion.
+Go/no-go: **go**. Every security, exact-tree, control-plane, and live-host launch gate is closed. The unchecked five-user study is post-launch outcome research and does not retroactively gate the technical release.
