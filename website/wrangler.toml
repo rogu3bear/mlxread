@@ -2,6 +2,7 @@ name = "mlxread-web"
 main = "build/_worker.js"
 compatibility_date = "2026-04-22"
 upload_source_maps = true
+routes = [{ pattern = "mlxread.com", custom_domain = true }]
 
 [build]
 command = "bash ./scripts/build-edge.sh"
