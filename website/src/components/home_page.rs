@@ -8,9 +8,9 @@ use crate::components::widgets::{OptEsc, Waveform};
 
 /// Source home and the signed-release download. Update the slug in one place.
 pub const REPO_URL: &str = "https://github.com/rogu3bear/mlxread";
-/// The latest signed .app zip from GitHub Releases (stable "latest" URL).
+/// The latest signed and notarized installer image (stable "latest" URL).
 pub const DOWNLOAD_URL: &str =
-    "https://github.com/rogu3bear/mlxread/releases/latest/download/MLXRead.zip";
+    "https://github.com/rogu3bear/mlxread/releases/latest/download/MLXRead.dmg";
 
 #[derive(Clone, Copy, PartialEq, Eq)]
 enum Phase {
@@ -128,7 +128,7 @@ fn HeroDemo() -> impl IntoView {
                 </div>
                 <p class="hero__foot mono muted">
                     "macOS 14+ · Apple Silicon · signed & notarized · ~"
-                    <span class="dl-size">"26 MB"</span>
+                    <span class="dl-size">"30 MB"</span>
                 </p>
             </div>
 
@@ -370,9 +370,9 @@ fn OpenSource() -> impl IntoView {
                     <div class="install__get">
                         <A href="/get-started" attr:class="btn btn--primary">"Install MLXRead"</A>
                         <p class="mono muted install__hint">
-                            "Unzip, drag to Applications, and open it. "
+                            "Open the DMG, drag MLXRead to Applications, and launch it. "
                             <b>"Signed and notarized by Apple"</b>
-                            " — no Gatekeeper warning."
+                            " — macOS can verify the developer and release."
                         </p>
                         <div class="terminal">
                             <div class="titlebar">

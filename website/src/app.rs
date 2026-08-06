@@ -48,15 +48,18 @@ pub fn App() -> impl IntoView {
         <Router>
             <AppLayout>
                 <Routes fallback=|| view! { <NotFoundPage/> }.into_view()>
-                    <Route path=StaticSegment("") view=HomePage ssr=SsrMode::OutOfOrder/>
-                    <Route path=StaticSegment("get-started") view=GetStartedPage ssr=SsrMode::OutOfOrder/>
-                    <Route path=StaticSegment("privacy") view=PrivacyPage ssr=SsrMode::OutOfOrder/>
-                    <Route path=StaticSegment("terms") view=TermsPage ssr=SsrMode::OutOfOrder/>
-                    <Route path=StaticSegment("faq") view=FaqPage ssr=SsrMode::OutOfOrder/>
-                    <Route path=StaticSegment("support") view=SupportPage ssr=SsrMode::OutOfOrder/>
+                    // These routes have no async resources. Async mode emits one
+                    // complete route document and avoids suspended-fragment
+                    // streaming that adds no value for this site.
+                    <Route path=StaticSegment("") view=HomePage ssr=SsrMode::Async/>
+                    <Route path=StaticSegment("get-started") view=GetStartedPage ssr=SsrMode::Async/>
+                    <Route path=StaticSegment("privacy") view=PrivacyPage ssr=SsrMode::Async/>
+                    <Route path=StaticSegment("terms") view=TermsPage ssr=SsrMode::Async/>
+                    <Route path=StaticSegment("faq") view=FaqPage ssr=SsrMode::Async/>
+                    <Route path=StaticSegment("support") view=SupportPage ssr=SsrMode::Async/>
                     // Must be last: guarantees deep links and hard refreshes get
                     // a full SSR HTML shell on the edge.
-                    <Route path=WildcardSegment("any") view=NotFoundPage ssr=SsrMode::OutOfOrder/>
+                    <Route path=WildcardSegment("any") view=NotFoundPage ssr=SsrMode::Async/>
                 </Routes>
             </AppLayout>
         </Router>

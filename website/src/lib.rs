@@ -10,6 +10,11 @@ const CONTENT_SECURITY_POLICY_HEADER: &str = "content-security-policy";
 const X_FRAME_OPTIONS_HEADER: &str = "x-frame-options";
 #[cfg(feature = "ssr")]
 const MAX_SERVER_FUNCTION_BODY_BYTES: usize = 4 * 1024;
+#[cfg(feature = "ssr")]
+const EMPTY_RESOURCE_BOOTSTRAP_SCRIPT: &str =
+    "__RESOLVED_RESOURCES=[];__SERIALIZED_ERRORS=[];__PENDING_RESOURCES=[];__RESOURCE_RESOLVERS=[];";
+#[cfg(feature = "ssr")]
+const EMPTY_CHUNK_BOOTSTRAP_SCRIPT: &str = "__INCOMPLETE_CHUNKS=[];";
 
 #[cfg(feature = "ssr")]
 #[worker::event(fetch)]
@@ -216,8 +221,7 @@ fn content_security_policy(
     let script_sources = if cfg!(debug_assertions) {
         "'self' 'unsafe-inline' 'wasm-unsafe-eval'".to_string()
     } else {
-        let hash = hydration_script_hash(options);
-        format!("'self' 'sha256-{hash}' 'wasm-unsafe-eval'")
+        release_script_sources(options)
     };
     let value = format!(
         "default-src 'self'; base-uri 'none'; object-src 'none'; frame-ancestors 'none'; form-action 'self'; img-src 'self' data:; connect-src 'self'; style-src 'self' 'unsafe-inline'; script-src {script_sources};"
@@ -227,11 +231,26 @@ fn content_security_policy(
 }
 
 #[cfg(feature = "ssr")]
+fn release_script_sources(options: &leptos::prelude::LeptosOptions) -> String {
+    let hydration_hash = hydration_script_hash(options);
+    let resource_hash = script_hash(EMPTY_RESOURCE_BOOTSTRAP_SCRIPT);
+    let chunk_hash = script_hash(EMPTY_CHUNK_BOOTSTRAP_SCRIPT);
+    format!(
+        "'self' 'sha256-{hydration_hash}' 'sha256-{resource_hash}' 'sha256-{chunk_hash}' 'wasm-unsafe-eval'"
+    )
+}
+
+#[cfg(feature = "ssr")]
 fn hydration_script_hash(options: &leptos::prelude::LeptosOptions) -> String {
+    script_hash(&hydration_script(options))
+}
+
+#[cfg(feature = "ssr")]
+fn script_hash(script: &str) -> String {
     use base64::Engine;
     use sha2::{Digest, Sha256};
 
-    let digest = Sha256::digest(hydration_script(options).as_bytes());
+    let digest = Sha256::digest(script.as_bytes());
     base64::engine::general_purpose::STANDARD.encode(digest)
 }
 
@@ -379,6 +398,24 @@ pub fn hydrate() {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[cfg(feature = "ssr")]
+    #[test]
+    fn release_csp_authorizes_only_known_inline_bootstrap_scripts() {
+        let options = leptos::prelude::get_configuration(None)
+            .expect("Leptos configuration")
+            .leptos_options;
+        let policy = release_script_sources(&options);
+
+        for script in [
+            hydration_script(&options),
+            EMPTY_RESOURCE_BOOTSTRAP_SCRIPT.to_string(),
+            EMPTY_CHUNK_BOOTSTRAP_SCRIPT.to_string(),
+        ] {
+            assert!(policy.contains(&format!("'sha256-{}'", script_hash(&script))));
+        }
+        assert!(!policy.contains("'unsafe-inline'"));
+    }
 
     #[test]
     fn origin_matching_normalizes_case_and_default_ports() {

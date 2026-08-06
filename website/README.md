@@ -3,6 +3,9 @@
 The public product, first-read, privacy, FAQ, and support experience for
 [MLXRead](../README.md). It is a Leptos 0.8 application with edge SSR,
 progressive router navigation, and one hydrated read-lifecycle interaction.
+Synchronous product routes use complete-document SSR so the edge does not emit
+out-of-order suspended fragments. Leptos's deterministic empty resource-state
+scripts and the hydration module are authorized by exact CSP hashes.
 
 ## Product routes
 
@@ -47,8 +50,9 @@ The Leptos development server listens at `http://127.0.0.1:57591`.
 bash ./scripts/verify.sh
 ```
 
-The release gate runs formatting, SSR compilation, the complete WASM and edge
-build, asset/runtime contract checks, and a Wrangler deployment dry-run.
+The release gate runs formatting, SSR compilation, the complete browser and
+edge WASM builds through the Cargo.lock-resolved `wasm-bindgen` CLI,
+asset/runtime contract checks, and a Wrangler deployment dry-run.
 
 ## Build and preview
 

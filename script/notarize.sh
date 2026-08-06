@@ -18,7 +18,13 @@ TEAM_ID="${NOTARY_TEAM_ID:-4JB58L7BTZ}"
 IDENTITY="Developer ID Application: MLNavigator Inc. (${TEAM_ID})"
 APP="dist/MLXRead.app"
 ZIP="dist/MLXRead.zip"
+DMG="dist/MLXRead.dmg"
 TAG="${RELEASE_TAG:-v0.1.0}"
+
+# Publication is part of this command's contract. Fail before expensive build
+# and notarization work if the destination cannot be reached.
+command -v gh >/dev/null 2>&1 || { echo "error: gh is required to publish release assets" >&2; exit 1; }
+gh release view "$TAG" >/dev/null 2>&1 || { echo "error: GitHub release $TAG does not exist or is inaccessible" >&2; exit 1; }
 
 # 1) Build the Developer ID app if it's missing (or --rebuild).
 if [[ "${1:-}" == "--rebuild" || ! -d "$APP" ]]; then
@@ -48,35 +54,54 @@ if ! xcrun notarytool history --keychain-profile "$PROFILE" >/dev/null 2>&1; the
   fi
 fi
 
-# 3) Submit to Apple's notary service and wait for the verdict.
-echo "==> Submitting to Apple (this usually takes 1-5 minutes)"
-set +e
-xcrun notarytool submit "$ZIP" --keychain-profile "$PROFILE" --wait | tee /tmp/mlxread-notary.out
-SUBMIT_STATUS=${PIPESTATUS[0]}
-set -e
-if [[ $SUBMIT_STATUS -ne 0 ]] || grep -q "status: Invalid" /tmp/mlxread-notary.out; then
-  ID=$(awk '/^ *id:/{print $2; exit}' /tmp/mlxread-notary.out)
-  echo "==> Notarization did not pass. Detailed log:" >&2
-  [[ -n "$ID" ]] && xcrun notarytool log "$ID" --keychain-profile "$PROFILE" >&2 || true
-  exit 1
-fi
+submit_notarization() {
+  local artifact="$1"
+  local output
+  local submit_status
+  local id
 
-# 4) Staple the ticket into the app so it verifies offline, then re-zip.
-echo "==> Stapling and re-zipping"
+  output="$(mktemp "${TMPDIR:-/tmp}/mlxread-notary.XXXXXX")"
+  echo "==> Submitting $artifact to Apple (this usually takes 1-5 minutes)"
+  set +e
+  xcrun notarytool submit "$artifact" --keychain-profile "$PROFILE" --wait | tee "$output"
+  submit_status=${PIPESTATUS[0]}
+  set -e
+  if [[ $submit_status -ne 0 ]] || grep -q "status: Invalid" "$output"; then
+    id=$(awk '/^ *id:/{print $2; exit}' "$output")
+    echo "==> Notarization did not pass. Detailed log:" >&2
+    [[ -n "$id" ]] && xcrun notarytool log "$id" --keychain-profile "$PROFILE" >&2 || true
+    rm -f "$output"
+    exit 1
+  fi
+  rm -f "$output"
+}
+
+# 3) Notarize the update archive so the contained app receives a ticket.
+submit_notarization "$ZIP"
+
+# 4) Staple the app for offline verification, then rebuild both release assets.
+echo "==> Stapling app and rebuilding release assets"
 xcrun stapler staple "$APP"
 xcrun stapler validate "$APP"
 rm -f "$ZIP"
 ditto -c -k --keepParent "$APP" "$ZIP"
+bash script/create-dmg.sh "$APP" "$DMG"
 
-# 5) Confirm Gatekeeper now accepts it (should say "accepted").
+# 5) Sign, verify, notarize, and staple the container a person actually downloads.
+echo "==> Signing installer image"
+codesign --force --timestamp --sign "$IDENTITY" "$DMG"
+codesign --verify --verbose=4 "$DMG"
+submit_notarization "$DMG"
+xcrun stapler staple "$DMG"
+xcrun stapler validate "$DMG"
+
+# 6) Confirm Gatekeeper now accepts the installed app (should say "accepted").
 echo "==> Gatekeeper assessment"
 spctl -a -vvv "$APP"
 
-# 6) Update the GitHub release asset, if gh + the release exist.
-if command -v gh >/dev/null 2>&1 && gh release view "$TAG" >/dev/null 2>&1; then
-  echo "==> Updating GitHub release $TAG asset"
-  gh release upload "$TAG" "$ZIP" --clobber
-fi
+# 7) Publish both contracts: DMG for people, ZIP for Sparkle updates.
+echo "==> Updating GitHub release $TAG assets"
+gh release upload "$TAG" "$DMG" "$ZIP" --clobber
 
 echo
-echo "==> Done: notarized, stapled, and published. No Gatekeeper prompt for users."
+echo "==> Done: notarized, stapled, and published DMG + Sparkle ZIP."

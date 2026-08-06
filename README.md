@@ -5,7 +5,7 @@ A local, private replacement for macOS "Speak Selection": press **⌥⎋
 text-to-speech model running entirely on your Mac. Press ⌥⎋ again and it
 stops instantly.
 
-**[Download the latest release](https://github.com/rogu3bear/mlxread/releases/latest)** (Developer ID–signed `.app`, macOS 14+ · Apple Silicon) · **Product website:** [mlxread-web.pages.dev](https://mlxread-web.pages.dev)
+**[Download the latest release](https://github.com/rogu3bear/mlxread/releases/latest/download/MLXRead.dmg)** (signed and notarized DMG, macOS 14+ · Apple Silicon) · **Product website:** [mlxread.com](https://mlxread.com)
 
 - Menu-bar utility (no Dock icon), SwiftUI + AppKit at the edges; optional
   **launch at login** keeps it always on, a keystroke away
@@ -100,8 +100,8 @@ script/test.sh                 # unit tests (fast, no network, no models)
 script/test.sh --integration   # + real model download & synthesis tests
 script/test.sh --ui            # + UI launch smoke test
 script/benchmark.sh [soprano|kokoro|all]   # measured synthesis benchmark
-script/package.sh              # → dist/MLXRead.app + dist/MLXRead.zip (signed)
-script/notarize.sh             # notarize + staple + update the GitHub release
+script/package.sh              # → .app + Sparkle ZIP + manual-install DMG
+script/notarize.sh             # notarize + staple + publish DMG and ZIP
 script/clean.sh                # trash scattered build-dir apps; keep only dist/
 ```
 
@@ -112,8 +112,10 @@ stale or unsigned build can't be opened by accident.
 
 ### Notarizing a release (one command)
 
-`script/notarize.sh` builds (if needed), notarizes with Apple, staples the
-ticket, re-zips, and updates the GitHub release — a single command:
+`script/notarize.sh` builds (if needed), notarizes with Apple, staples the app,
+rebuilds and notarizes the DMG, and updates both GitHub release assets — a
+single command. People install from `MLXRead.dmg`; Sparkle continues to consume
+`MLXRead.zip` as its update archive.
 
 ```bash
 ./script/notarize.sh
@@ -121,8 +123,9 @@ ticket, re-zips, and updates the GitHub release — a single command:
 
 The first run prompts once for your Apple ID and an app-specific password
 (create one at appleid.apple.com → Sign-In & Security), storing them in your
-Keychain; every run after is automatic. After notarization, users no longer see
-a Gatekeeper prompt on first launch.
+Keychain; every run after is automatic. Notarization prevents the unverified-
+developer block; macOS may still show its standard first-open confirmation for
+an app downloaded from the internet.
 
 Measured results for this machine are recorded in
 [docs/testing.md](docs/testing.md).
@@ -135,9 +138,9 @@ Status and evidence: [docs/system-voice-provider.md](docs/system-voice-provider.
 
 A product and first-read site lives in [`website/`](website/) — Leptos SSR with
 an interactive ⌥⎋ read-lifecycle preview, deployed to Cloudflare Pages at
-**https://mlxread-web.pages.dev**. It also hosts the
-[FAQ](https://mlxread-web.pages.dev/faq) and a
-[Support](https://mlxread-web.pages.dev/support) page with a contact form.
+**https://mlxread.com**. It also hosts the
+[FAQ](https://mlxread.com/faq) and a
+[Support](https://mlxread.com/support) page with a contact form.
 Details in [website/README.md](website/README.md).
 
 ## Troubleshooting
@@ -171,7 +174,8 @@ Details in [website/README.md](website/README.md).
 - PDF viewers must expose a text layer through Accessibility or respond
   to ⌘C for capture to work.
 - The published `.app` is Developer ID–signed, hardened-runtime, and
-  **notarized by Apple** — it opens without a Gatekeeper prompt. Re-cut a
+  **notarized by Apple**. macOS may show its standard first-open confirmation,
+  but it should not block the app as an unidentified developer. Re-cut a
   notarized release anytime with `./script/notarize.sh`.
 
 ## Support
@@ -180,8 +184,8 @@ Details in [website/README.md](website/README.md).
   (never your text — only versions, model/permission state, and recent logs)
   and sends it straight to the maintainer.
 - **FAQ & troubleshooting:**
-  [mlxread-web.pages.dev/faq](https://mlxread-web.pages.dev/faq) and
-  [/support](https://mlxread-web.pages.dev/support), which has a contact form.
+  [mlxread.com/faq](https://mlxread.com/faq) and
+  [/support](https://mlxread.com/support), which has a contact form.
 - **Bugs & features:** open an issue at
   [github.com/rogu3bear/mlxread/issues](https://github.com/rogu3bear/mlxread/issues).
 - **Security:** see [SECURITY.md](SECURITY.md) — please report privately first.

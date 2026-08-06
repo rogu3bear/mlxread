@@ -23,9 +23,11 @@ The highest-value residual risks are:
    intentionally best-effort.
 
 The checked local `dist/MLXRead.app` is Developer ID-signed, hardened,
-notarized, and stapled. The public GitHub v0.1.0 release also has a downloadable
-ZIP with a published SHA-256 digest. Those facts are artifact/distribution
-evidence, not proof that the checked-in Sparkle update channel is active: the
+notarized, and stapled. The public GitHub v0.1.0 release currently has a
+downloadable ZIP with a published SHA-256 digest; the production release path
+now builds a separately notarized and stapled DMG for manual installation while
+retaining the ZIP for Sparkle. Those facts are artifact/distribution evidence,
+not proof that the checked-in Sparkle update channel is active: the
 repository's `SUFeedURL`, public key, and `appcast.xml` remain placeholders, and
 `UpdateService` deliberately stays inactive in that state.
 
@@ -140,7 +142,7 @@ Boundary notes:
 | Diagnostic ZIP and support content | Confidentiality and integrity | Contains user-entered content, device/app metadata, logs, and IP metadata |
 | R2 bearer URL | Confidentiality | It is the sole access capability for a stored report |
 | Model/G2P cache | Integrity | Unverified assets drive in-process parsing and speech behavior |
-| Signed app, update key, and appcast | Authenticity and integrity | Compromise can distribute a privileged look-alike or malicious update |
+| Signed app, installer DMG, Sparkle ZIP, update key, and appcast | Authenticity and integrity | Compromise can distribute a privileged look-alike or malicious update |
 | Build host and dependency pins | Integrity | They determine what receives the trusted signature |
 | Website/Worker availability | Availability | Abuse can suppress support or create delivery cost/noise |
 
@@ -187,7 +189,7 @@ Boundary notes:
 | API `/contact` | Internet/site proxy → email | Validation, honeypot, KV throttle, restricted recipient | Email-key throttling is gameable and KV increments are non-atomic |
 | API `/report` | App/internet → R2/email | Non-secret token, size cap, IP throttle, restricted recipient | Token replay; free-form description; ZIP content trusted from client |
 | API `/d/:id` | Bearer URL → R2 object | Random 128-bit ID and `private, no-store` | No authenticated maintainer gate or visible expiry |
-| Build and release | Dependencies/build host → signed app | Pin file, Developer ID, notarization, GitHub digest | Validation-skip flags and signing-key exposure on build host |
+| Build and release | Dependencies/build host → signed app, DMG, and update ZIP | Pin file, Developer ID, app and DMG notarization/stapling, GitHub digest | Validation-skip flags and signing-key exposure on build host |
 
 ## 7. Top abuse paths
 
@@ -220,7 +222,7 @@ Boundary notes:
 | TM-002 | Bearer URL leak after a report exists | Unauthorized diagnostic ZIP download; long-lived metadata/content exposure | 128-bit random ID; no listing route; `private, no-store` | Put `/d/*` behind maintainer authentication or issue one-time/expiring signed capabilities; define and enforce R2 lifecycle deletion | Access logs keyed by object ID; deletion receipts | Medium | High | **High** |
 | TM-003 | Unauthenticated client; copied app token; many IPs/emails | Mail/R2 abuse, support denial, cost and alert fatigue | Input/size caps, honeypot, best-effort KV throttles, restricted email destination | Treat app token as public; use atomic rate limiting/bot defense and route-specific quotas; bound R2 writes | 429/error ratios, R2 object rate, email-volume alerts | Medium | Medium | **Medium** |
 | TM-004 | Compromised mutable model/G2P upstream or trusted TLS endpoint | Altered assets accepted into cache and parsed in-process | HTTPS/ATS; safetensors extension and non-empty/config JSON checks | Pin immutable revisions and verify every file against a shipped digest manifest before activation | Record expected/actual digests without content; fail closed on mismatch | Low | High | **High** |
-| TM-005 | Feed/build misconfiguration or release-key compromise | Malicious or unavailable update/distribution channel | Placeholder guard; HTTPS; Sparkle EdDSA; Developer ID; hardened runtime; notarization; stapling; GitHub asset digest | Replace templates only in a controlled release transaction; keep update private key off repo and least-privileged; verify public appcast/archive/signature live | Release receipt covering code signature, notarization, digest, appcast signature, and live fetch | Low | High | **High** |
+| TM-005 | Feed/build misconfiguration or release-key compromise | Malicious or unavailable update/distribution channel | Placeholder guard; HTTPS; Sparkle EdDSA; Developer ID; hardened runtime; app and DMG notarization/stapling; GitHub asset digest | Replace templates only in a controlled release transaction; keep update private key off repo and least-privileged; verify the manual-install DMG and Sparkle archive independently | Release receipt covering code signature, app and DMG notarization, both asset digests, appcast signature, and live fetch | Low | High | **High** |
 | TM-006 | Malicious dependency, plugin/macro, or compromised build host | Tamper with signed app or steal signing material | Swift package pins, Apple signing/notarization | Release scripts skip plugin/macro validation; isolate release host, review pin/plugin changes, avoid validation bypass for release, use short-lived credentials | Dependency diff gate, build provenance, key-use alerts | Low | High | **Medium** |
 | TM-007 | Same-user clipboard observer; fallback required | Reads temporary selected text from general pasteboard | AX first; bounded fallback; `changeCount`-safe restoration; user can disable fallback | Document residual risk; consider per-app fallback consent/deny list and minimize exposure window | Count fallback use without content; user-visible fallback indicator | Medium | Medium | **Medium** |
 | TM-008 | Same-user process targeting Debug or mis-signed artifact | Attach/debug and read process memory | Public local artifact is Developer ID-signed, hardened, notarized, stapled, with no release `get-task-allow` | Make release gate fail if hardened runtime/notarization/entitlements differ; never distribute Debug builds | `codesign`, `spctl`, stapler, and entitlement checks bound to release digest | Low | High | **Medium** |
