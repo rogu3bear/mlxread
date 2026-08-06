@@ -91,6 +91,10 @@ targets:
       path: SystemVoiceProvider/Info.plist
       properties:
         CFBundleDisplayName: MLXRead Voice
+        # The embedded extension must match the containing app's release
+        # version or Xcode emits a distribution-validation warning.
+        CFBundleShortVersionString: "$(MARKETING_VERSION)"
+        CFBundleVersion: "$(CURRENT_PROJECT_VERSION)"
         NSExtension:
           NSExtensionPointIdentifier: com.apple.AudioUnit
           NSExtensionPrincipalClass: $(PRODUCT_MODULE_NAME).AudioUnitFactory
