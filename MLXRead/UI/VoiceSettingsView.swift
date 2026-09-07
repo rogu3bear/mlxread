@@ -12,7 +12,8 @@ struct VoiceSettingsView: View {
     }
 
     private var voices: [VoiceOption] {
-        modelStore.availableVoices(for: settings.selectedModel)
+        guard modelStore.state(for: settings.selectedModel) == .downloaded else { return [] }
+        return modelStore.availableVoices(for: settings.selectedModel)
             .map { VoiceOption(id: $0) }
             .sorted { $0.name.localizedStandardCompare($1.name) == .orderedAscending }
     }
@@ -132,7 +133,7 @@ struct VoiceSettingsView: View {
         }
         .onChange(of: settings.selectedModelID) { _, _ in
             reconcileVoice()
-            coordinator.refreshAvailability()
+            coordinator.refreshAvailability(clearFailure: true)
         }
         .onChange(of: voice.languageCode) { _, _ in sampleText = voice.sampleText }
         .onChange(of: modelStore.state(for: settings.selectedModel)) { _, _ in
@@ -148,10 +149,10 @@ struct VoiceSettingsView: View {
     }
 
     private func reconcileVoice() {
-        guard settings.selectedModel.supportsVoices, !voices.isEmpty,
-              !voices.contains(where: { $0.id == settings.selectedVoice }) else { return }
-        settings.selectedVoice = voices.first(where: { $0.id == settings.selectedModel.defaultVoice })?.id
-            ?? voices[0].id
+        settings.reconcileVoice(
+            availableVoices: voices.map(\.id),
+            downloadState: modelStore.state(for: settings.selectedModel)
+        )
     }
 
     @ViewBuilder

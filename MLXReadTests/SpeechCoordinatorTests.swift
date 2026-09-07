@@ -318,6 +318,62 @@ final class SpeechCoordinatorTests: XCTestCase {
         XCTAssertEqual(coordinator.state, .permissionRequired)
     }
 
+    func testUnchangedAvailabilityPreservesReadingErrorUntilRetry() async throws {
+        let selection = FakeSelectionReader()
+        selection.result = .noSelection
+        let coordinator = makeCoordinator(selection: selection, engine: GatedEngine(chunkCount: 1))
+        coordinator.beginReadingSelection()
+        try await waitUntil { coordinator.state == .failed(.noSelectionFound) }
+
+        // Model download progress invokes this same refresh without changing readiness.
+        for _ in 0..<3 {
+            coordinator.refreshAvailability()
+            XCTAssertEqual(coordinator.state, .failed(.noSelectionFound))
+        }
+
+        selection.result = .text("Try reading again.", source: .accessibility)
+        coordinator.beginReadingSelection()
+        XCTAssertTrue(coordinator.state.isBusy)
+        try await waitUntil { coordinator.state == .idle }
+    }
+
+    func testAvailabilityChangeReplacesReadingError() async throws {
+        let selection = FakeSelectionReader()
+        selection.result = .noSelection
+        let coordinator = makeCoordinator(selection: selection, engine: GatedEngine())
+        var gate: SpeechState?
+        coordinator.availabilityCheck = { gate }
+        coordinator.beginReadingSelection()
+        try await waitUntil { coordinator.state == .failed(.noSelectionFound) }
+
+        gate = .modelRequired
+        coordinator.refreshAvailability()
+        XCTAssertEqual(coordinator.state, .modelRequired)
+        gate = nil
+        coordinator.refreshAvailability()
+        XCTAssertEqual(coordinator.state, .idle)
+    }
+
+    func testExplicitModelSelectionCanClearReadingError() async throws {
+        let selection = FakeSelectionReader()
+        selection.result = .noSelection
+        let coordinator = makeCoordinator(selection: selection, engine: GatedEngine())
+        coordinator.beginReadingSelection()
+        try await waitUntil { coordinator.state == .failed(.noSelectionFound) }
+        coordinator.refreshAvailability(clearFailure: true)
+        XCTAssertEqual(coordinator.state, .idle)
+    }
+
+    func testPreviewErrorSurvivesUnchangedSelectionPermission() async throws {
+        let coordinator = makeCoordinator(engine: GatedEngine(chunkCount: 0))
+        coordinator.availabilityCheck = { .permissionRequired }
+        coordinator.speakSample("The model produces no audio for this preview.")
+        let expected = SpeechState.failed(.synthesisFailed("the model produced no audio"))
+        try await waitUntil { coordinator.state == expected }
+        coordinator.refreshAvailability()
+        XCTAssertEqual(coordinator.state, expected)
+    }
+
     func testEnginePrepareReusedAcrossReads() async throws {
         let engine = GatedEngine(chunkCount: 1, chunkDelay: .zero)
         let coordinator = makeCoordinator(engine: engine)

@@ -40,7 +40,8 @@ struct MenuBarContent: View {
             }
             .disabled(coordinator.state.isBusy)
 
-            if settings.selectedModel.supportsVoices {
+            if settings.selectedModel.supportsVoices,
+               modelStore.state(for: settings.selectedModel) == .downloaded {
                 let voices = modelStore.availableVoices(for: settings.selectedModel)
                 if !voices.isEmpty {
                     Picker("Voice", selection: voiceBinding) {
@@ -100,7 +101,7 @@ struct MenuBarContent: View {
                 if let model = ModelManifest.model(withID: newValue) {
                     settings.selectModel(model)
                 }
-                coordinator.refreshAvailability()
+                coordinator.refreshAvailability(clearFailure: true)
             }
         )
     }

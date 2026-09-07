@@ -32,6 +32,7 @@ final class SpeechCoordinator {
     private var currentGeneration: UUID?
     private var readingTask: Task<Void, Never>?
     private var activeEngine: (any SpeechEngine)?
+    private var lastAvailability: SpeechState?
 
     init(
         selection: any SelectionCapturing,
@@ -47,14 +48,16 @@ final class SpeechCoordinator {
         self.maximumLengthProvider = maximumLengthProvider
     }
 
-    /// Recomputes the resting state (permission/model gates) when idle.
-    func refreshAvailability() {
+    /// Recomputes permission/model gates, retaining errors across unchanged updates.
+    func refreshAvailability(clearFailure: Bool = false) {
         guard !state.isBusy else { return }
-        if let gated = availabilityCheck() {
-            state = gated
-        } else if !state.isBusy {
-            state = .idle
+        let gated = availabilityCheck()
+        let availabilityChanged = gated != lastAvailability
+        lastAvailability = gated
+        if case .failed = state, !clearFailure, !availabilityChanged {
+            return
         }
+        state = gated ?? .idle
     }
 
     /// Hotkey entry point. Busy → cancel; otherwise start a read.
@@ -67,7 +70,7 @@ final class SpeechCoordinator {
     }
 
     func beginReadingSelection() {
-        refreshAvailability()
+        refreshAvailability(clearFailure: true)
         switch state {
         case .idle, .failed:
             break
@@ -122,6 +125,7 @@ final class SpeechCoordinator {
 
     private func startReading(source: ReadingSource) {
         lastReadWasTruncated = false
+        lastAvailability = availabilityCheck()
         let generation = UUID()
         currentGeneration = generation
         activeConfiguration = configurationProvider()

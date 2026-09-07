@@ -63,6 +63,14 @@ final class AppSettings {
         selectedVoice = defaults.string(forKey: "voice.\(model.id)") ?? model.defaultVoice ?? ""
     }
 
+    /// Partial downloads cannot establish that a saved voice is unavailable.
+    func reconcileVoice(availableVoices: [String], downloadState: ModelDownloadState) {
+        guard downloadState == .downloaded, selectedModel.supportsVoices,
+              !availableVoices.isEmpty, !availableVoices.contains(selectedVoice) else { return }
+        selectedVoice = selectedModel.defaultVoice.flatMap { availableVoices.contains($0) ? $0 : nil }
+            ?? availableVoices[0]
+    }
+
     var speechConfiguration: SpeechConfiguration {
         let model = selectedModel
         return SpeechConfiguration(

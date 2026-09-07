@@ -34,8 +34,14 @@ permissionRequired / modelRequired  (resting gates, recomputed when idle)
 idle ─⌥⎋─► capturing ─► preparing ─► generating ─► playing ─► idle
   ▲                                     │             │
   └──────── stopping ◄──── ⌥⎋ ──────────┴─────────────┘
-failed(error)  (any step; retained until the next read or availability change)
+failed(error)  (any step; retained until the next read, model choice, or readiness change)
 ```
+
+Availability refreshes compare the current permission/model gate with the
+previous one. Download progress and other unchanged updates retain a reading
+error; retrying or choosing another model can clear it explicitly. Voice
+choices are reconciled with the files on disk only after the model is downloaded,
+so a partial voice catalog cannot replace the saved choice.
 
 Every read gets a **generation UUID**. The UUID is checked:
 1. in the coordinator loop before each chunk is forwarded,

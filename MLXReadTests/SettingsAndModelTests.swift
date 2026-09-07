@@ -83,6 +83,37 @@ final class AppSettingsTests: XCTestCase {
         defaults.set(4.0, forKey: Constants.DefaultsKey.speechSpeed)
         XCTAssertEqual(AppSettings(defaults: defaults).speechSpeed, 2)
     }
+
+    func testPartialVoiceCatalogDoesNotReplacePersistedChoice() {
+        let settings = AppSettings(defaults: defaults)
+        settings.selectModel(ModelManifest.kokoro)
+        settings.selectedVoice = "bf_emma"
+
+        let states: [ModelDownloadState] = [.notDownloaded, .downloading(fraction: 0.2),
+                                            .downloading(fraction: 0.9), .failed("Interrupted")]
+        for state in states {
+            settings.reconcileVoice(availableVoices: ["af_aoede", "af_heart"], downloadState: state)
+            XCTAssertEqual(AppSettings(defaults: defaults).selectedVoice, "bf_emma")
+        }
+
+        settings.reconcileVoice(availableVoices: ["af_aoede", "af_heart", "bf_emma"], downloadState: .downloaded)
+        settings.selectModel(ModelManifest.soprano)
+        let reloaded = AppSettings(defaults: defaults)
+        reloaded.selectModel(ModelManifest.kokoro)
+        XCTAssertEqual(reloaded.selectedVoice, "bf_emma")
+    }
+
+    func testCompletedVoiceCatalogRepairsAnUnavailableChoice() {
+        let settings = AppSettings(defaults: defaults)
+        settings.selectModel(ModelManifest.kokoro)
+        settings.selectedVoice = "missing_voice"
+        settings.reconcileVoice(availableVoices: [], downloadState: .downloaded)
+        XCTAssertEqual(settings.selectedVoice, "missing_voice")
+        settings.reconcileVoice(availableVoices: ["af_aoede", "af_heart"], downloadState: .downloaded)
+        XCTAssertEqual(AppSettings(defaults: defaults).selectedVoice, "af_heart")
+        settings.reconcileVoice(availableVoices: ["af_aoede"], downloadState: .downloaded)
+        XCTAssertEqual(AppSettings(defaults: defaults).selectedVoice, "af_aoede")
+    }
 }
 
 final class VoiceOptionTests: XCTestCase {

@@ -57,7 +57,7 @@ struct ModelSettingsView: View {
                 if settings.selectedModelID != model.id {
                     Button("Use for Reading") {
                         settings.selectModel(model)
-                        coordinator.refreshAvailability()
+                        coordinator.refreshAvailability(clearFailure: true)
                     }
                 }
                 Button("Move to Trash", role: .destructive) {
