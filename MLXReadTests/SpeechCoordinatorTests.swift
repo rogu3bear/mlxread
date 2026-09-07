@@ -59,16 +59,23 @@ actor GatedEngine: SpeechEngine {
     private(set) var receivedConfigurations: [SpeechConfiguration] = []
     let chunkCount: Int
     let chunkDelay: Duration
+    let holdPreparation: Bool
+    private var preparation: CheckedContinuation<Void, Never>?
 
-    init(chunkCount: Int = 3, chunkDelay: Duration = .milliseconds(20), handlesSpeechSpeed: Bool = false) {
+    init(chunkCount: Int = 3, chunkDelay: Duration = .milliseconds(20), handlesSpeechSpeed: Bool = false,
+         holdPreparation: Bool = false) {
         self.chunkCount = chunkCount
         self.chunkDelay = chunkDelay
         self.handlesSpeechSpeed = handlesSpeechSpeed
+        self.holdPreparation = holdPreparation
     }
 
     func prepare() async throws {
         prepareCount += 1
+        if holdPreparation { await withCheckedContinuation { preparation = $0 } }
     }
+
+    func releasePreparation() { preparation?.resume(); preparation = nil }
 
     nonisolated func generate(
         text: String,
@@ -260,6 +267,42 @@ final class SpeechCoordinatorTests: XCTestCase {
         XCTAssertGreaterThanOrEqual(cancels, 1)
         let enqueued = await player.enqueuedChunks
         XCTAssertLessThan(enqueued.count, 50, "generation should have been cut short")
+    }
+
+    func testRepeatedStopKeepsPreparationOwnedUntilItCompletes() async throws {
+        let player = FakeAudioPlayer()
+        let original = GatedEngine(holdPreparation: true)
+        let replacement = GatedEngine()
+        var selected: any SpeechEngine = original
+        let coordinator = SpeechCoordinator(
+            selection: FakeSelectionReader(), player: player,
+            engineProvider: { selected }, configurationProvider: { SpeechConfiguration() }
+        )
+        coordinator.speakSample("A cold preview is still preparing.")
+        // The actor enters prepare before accepting this subsequent message.
+        while await original.prepareCount == 0 { await Task.yield() }
+        coordinator.stop()
+        coordinator.stop()
+        coordinator.toggle()
+        try await Task.sleep(for: .milliseconds(50))
+        selected = replacement
+        coordinator.speakSample("A different model must wait for cleanup.")
+        try await Task.sleep(for: .milliseconds(50))
+        XCTAssertEqual(coordinator.state, .stopping)
+        let replacementLoads = await replacement.prepareCount
+        let cancellations = await original.cancelCount
+        let audioStops = await player.stopCount
+        XCTAssertEqual(replacementLoads, 0)
+        XCTAssertEqual(cancellations, 1)
+        XCTAssertEqual(audioStops, 1, "Playback stops without waiting for model preparation")
+        await original.releasePreparation()
+        try await waitUntil { coordinator.state == .idle }
+        coordinator.speakSample("The next model can now prepare.")
+        try await waitUntil { coordinator.state == .playing }
+        let resumedLoads = await replacement.prepareCount
+        XCTAssertEqual(resumedLoads, 1)
+        coordinator.stop()
+        try await waitUntil { coordinator.state == .idle }
     }
 
     func testToggleStartsWhenIdleAndStopsWhenBusy() async throws {

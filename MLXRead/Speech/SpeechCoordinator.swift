@@ -96,6 +96,7 @@ final class SpeechCoordinator {
     }
 
     func stop() {
+        guard state != .stopping else { return }
         guard state.isBusy || readingTask != nil else { return }
         state = .stopping
         let task = readingTask
