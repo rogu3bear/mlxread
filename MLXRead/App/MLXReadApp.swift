@@ -42,7 +42,7 @@ private struct MenuBarIcon: View {
         case .playing: return "waveform.circle.fill"
         case .capturing, .preparing, .generating, .stopping: return "waveform.circle"
         case .failed: return "exclamationmark.circle"
-        case .permissionRequired, .modelRequired, .unavailable: return "waveform.slash"
+        case .permissionRequired, .modelRequired, .voiceRequired, .unavailable: return "waveform.slash"
         case .idle: return "waveform"
         }
     }

@@ -63,14 +63,6 @@ final class AppSettings {
         selectedVoice = defaults.string(forKey: "voice.\(model.id)") ?? model.defaultVoice ?? ""
     }
 
-    /// Partial downloads cannot establish that a saved voice is unavailable.
-    func reconcileVoice(availableVoices: [String], downloadState: ModelDownloadState) {
-        guard downloadState == .downloaded, selectedModel.supportsVoices,
-              !availableVoices.isEmpty, !availableVoices.contains(selectedVoice) else { return }
-        selectedVoice = selectedModel.defaultVoice.flatMap { availableVoices.contains($0) ? $0 : nil }
-            ?? availableVoices[0]
-    }
-
     var speechConfiguration: SpeechConfiguration {
         let model = selectedModel
         return SpeechConfiguration(
@@ -158,16 +150,18 @@ final class AppState {
             guard let self else { return SpeechState.unavailable }
             if !self.permissions.isTrusted { return .permissionRequired }
             if !self.usesMockEngine {
-                let model = self.settings.selectedModel
-                if self.modelStore.state(for: model) != .downloaded { return .modelRequired }
+                return self.modelStore.availability(
+                    for: self.settings.selectedModel, voice: self.settings.speechConfiguration.voice
+                )
             }
             return nil
         }
         // A built-in preview needs model assets, but reads no other app's text.
         coordinator.sampleAvailabilityCheck = { [weak self] in
             guard let self else { return .unavailable }
-            return self.usesMockEngine || self.modelStore.state(for: self.settings.selectedModel) == .downloaded
-                ? nil : .modelRequired
+            return self.usesMockEngine ? nil : self.modelStore.availability(
+                for: self.settings.selectedModel, voice: self.settings.speechConfiguration.voice
+            )
         }
         modelStore.onStateChange = { [weak self] in
             self?.coordinator.refreshAvailability()

@@ -45,6 +45,10 @@ struct MenuBarContent: View {
                 let voices = modelStore.availableVoices(for: settings.selectedModel)
                 if !voices.isEmpty {
                     Picker("Voice", selection: voiceBinding) {
+                        if let selectedVoice = settings.speechConfiguration.voice, !voices.contains(selectedVoice) {
+                            Text("\(VoiceOption(id: selectedVoice).name) (unavailable)")
+                                .tag(selectedVoice).disabled(true)
+                        }
                         ForEach(voices, id: \.self) { voice in
                             Text(String(VoiceOption(id: voice).menuLabel.prefix(30))).tag(voice)
                         }
@@ -108,8 +112,11 @@ struct MenuBarContent: View {
 
     private var voiceBinding: Binding<String> {
         Binding(
-            get: { settings.selectedVoice },
-            set: { settings.selectedVoice = $0 }
+            get: { settings.speechConfiguration.voice ?? "" },
+            set: {
+                settings.selectedVoice = $0
+                coordinator.refreshAvailability(clearFailure: true)
+            }
         )
     }
 

@@ -74,7 +74,7 @@ final class SpeechCoordinator {
         switch state {
         case .idle, .failed:
             break
-        case .permissionRequired, .modelRequired, .unavailable:
+        case .permissionRequired, .modelRequired, .voiceRequired, .unavailable:
             AppLogger.speech.notice("Read requested but state is \(String(describing: self.state.displayName))")
             return
         default:

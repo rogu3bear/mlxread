@@ -84,36 +84,7 @@ final class AppSettingsTests: XCTestCase {
         XCTAssertEqual(AppSettings(defaults: defaults).speechSpeed, 2)
     }
 
-    func testPartialVoiceCatalogDoesNotReplacePersistedChoice() {
-        let settings = AppSettings(defaults: defaults)
-        settings.selectModel(ModelManifest.kokoro)
-        settings.selectedVoice = "bf_emma"
 
-        let states: [ModelDownloadState] = [.notDownloaded, .downloading(fraction: 0.2),
-                                            .downloading(fraction: 0.9), .failed("Interrupted")]
-        for state in states {
-            settings.reconcileVoice(availableVoices: ["af_aoede", "af_heart"], downloadState: state)
-            XCTAssertEqual(AppSettings(defaults: defaults).selectedVoice, "bf_emma")
-        }
-
-        settings.reconcileVoice(availableVoices: ["af_aoede", "af_heart", "bf_emma"], downloadState: .downloaded)
-        settings.selectModel(ModelManifest.soprano)
-        let reloaded = AppSettings(defaults: defaults)
-        reloaded.selectModel(ModelManifest.kokoro)
-        XCTAssertEqual(reloaded.selectedVoice, "bf_emma")
-    }
-
-    func testCompletedVoiceCatalogRepairsAnUnavailableChoice() {
-        let settings = AppSettings(defaults: defaults)
-        settings.selectModel(ModelManifest.kokoro)
-        settings.selectedVoice = "missing_voice"
-        settings.reconcileVoice(availableVoices: [], downloadState: .downloaded)
-        XCTAssertEqual(settings.selectedVoice, "missing_voice")
-        settings.reconcileVoice(availableVoices: ["af_aoede", "af_heart"], downloadState: .downloaded)
-        XCTAssertEqual(AppSettings(defaults: defaults).selectedVoice, "af_heart")
-        settings.reconcileVoice(availableVoices: ["af_aoede"], downloadState: .downloaded)
-        XCTAssertEqual(AppSettings(defaults: defaults).selectedVoice, "af_aoede")
-    }
 }
 
 final class VoiceOptionTests: XCTestCase {
@@ -190,6 +161,97 @@ final class ModelStoreTests: XCTestCase {
         try plantValidModel(ModelManifest.kokoro, in: store)
         XCTAssertEqual(store.availableVoices(for: ModelManifest.kokoro), ["af_bella", "af_heart"])
         XCTAssertEqual(store.availableVoices(for: ModelManifest.soprano), [])
+    }
+
+    func testPartialCatalogPreservesVoiceAndGatesReadingAcrossRefreshAndRestart() async throws {
+        let suite = "me.jkca.mlxread.catalog-tests.\(UUID().uuidString)"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let settings = AppSettings(defaults: defaults)
+        settings.selectModel(ModelManifest.kokoro)
+        settings.selectedVoice = "bf_emma"
+        let store = ModelStore(rootDirectory: tempRoot)
+        try plantValidModel(ModelManifest.kokoro, in: store)
+
+        let engine = GatedEngine(chunkCount: 1, chunkDelay: .zero)
+        let coordinator = SpeechCoordinator(
+            selection: FakeSelectionReader(), player: FakeAudioPlayer(),
+            engineProvider: { engine }, configurationProvider: { settings.speechConfiguration }
+        )
+        coordinator.availabilityCheck = {
+            store.availability(for: settings.selectedModel, voice: settings.speechConfiguration.voice)
+        }
+        coordinator.sampleAvailabilityCheck = coordinator.availabilityCheck
+        store.onStateChange = { coordinator.refreshAvailability() }
+
+        // Config, weights and two other voices satisfy the legacy model check.
+        // The real refresh producer must still gate the absent saved voice.
+        store.refreshAllStates()
+        XCTAssertEqual(store.state(for: ModelManifest.kokoro), .downloaded)
+        XCTAssertEqual(coordinator.state, .voiceRequired)
+        coordinator.beginReadingSelection()
+        coordinator.speakSample("Do not silently substitute a different voice.")
+        let blockedPrepareCount = await engine.prepareCount
+        XCTAssertEqual(blockedPrepareCount, 0)
+        XCTAssertEqual(AppSettings(defaults: defaults).selectedVoice, "bf_emma")
+
+        let reopened = ModelStore(rootDirectory: tempRoot)
+        let restored = AppSettings(defaults: defaults)
+        XCTAssertEqual(reopened.availability(for: restored.selectedModel, voice: restored.speechConfiguration.voice), .voiceRequired)
+        XCTAssertEqual(restored.selectedVoice, "bf_emma")
+
+        // When the missing file arrives, the same refresh releases the gate.
+        let voiceFile = store.directory(for: ModelManifest.kokoro)
+            .appendingPathComponent("voices/bf_emma.safetensors")
+        try Data([9]).write(to: voiceFile)
+        store.refreshAllStates()
+        XCTAssertEqual(coordinator.state, .idle)
+        XCTAssertEqual(settings.selectedVoice, "bf_emma")
+        coordinator.speakSample("The chosen voice is now available.")
+        let deadline = Date().addingTimeInterval(5)
+        while coordinator.state.isBusy && Date() < deadline {
+            try await Task.sleep(for: .milliseconds(10))
+        }
+        XCTAssertEqual(coordinator.state, .idle)
+        let prepared = await engine.prepareCount
+        XCTAssertEqual(prepared, 1)
+    }
+
+    func testExplicitVoiceChoiceRecoversFromPartialCatalog() throws {
+        let suite = "me.jkca.mlxread.catalog-tests.\(UUID().uuidString)"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let settings = AppSettings(defaults: defaults)
+        settings.selectModel(ModelManifest.kokoro)
+        settings.selectedVoice = "bf_emma"
+        let store = ModelStore(rootDirectory: tempRoot)
+        try plantValidModel(ModelManifest.kokoro, in: store)
+        store.refreshAllStates()
+        XCTAssertEqual(store.availability(for: settings.selectedModel, voice: settings.speechConfiguration.voice), .voiceRequired)
+
+        settings.selectedVoice = "af_bella"
+        store.refreshAllStates()
+        XCTAssertNil(store.availability(for: settings.selectedModel, voice: settings.speechConfiguration.voice))
+        XCTAssertEqual(AppSettings(defaults: defaults).selectedVoice, "af_bella")
+    }
+
+    func testEmptyVoiceFileIsUnavailable() throws {
+        let store = ModelStore(rootDirectory: tempRoot)
+        try plantValidModel(ModelManifest.kokoro, in: store)
+        let voiceFile = store.directory(for: ModelManifest.kokoro)
+            .appendingPathComponent("voices/bf_emma.safetensors")
+        try Data().write(to: voiceFile)
+        store.refreshAllStates()
+        XCTAssertFalse(store.availableVoices(for: ModelManifest.kokoro).contains("bf_emma"))
+        XCTAssertEqual(store.availability(for: ModelManifest.kokoro, voice: "bf_emma"), .voiceRequired)
+
+        // Cache layouts may expose completed files through symbolic links.
+        try FileManager.default.removeItem(at: voiceFile)
+        try FileManager.default.createSymbolicLink(
+            at: voiceFile, withDestinationURL: voiceFile.deletingLastPathComponent().appendingPathComponent("af_heart.safetensors")
+        )
+        XCTAssertTrue(store.availableVoices(for: ModelManifest.kokoro).contains("bf_emma"))
+        XCTAssertNil(store.availability(for: ModelManifest.kokoro, voice: "bf_emma"))
     }
 
     func testRemoveDeletesDirectory() throws {

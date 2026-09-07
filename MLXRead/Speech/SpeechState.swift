@@ -6,6 +6,7 @@ enum SpeechState: Equatable {
     case unavailable
     case permissionRequired
     case modelRequired
+    case voiceRequired
     case idle
     case capturing
     case preparing
@@ -28,6 +29,7 @@ enum SpeechState: Equatable {
         case .unavailable: return "Unavailable"
         case .permissionRequired: return "Allow access in Settings"
         case .modelRequired: return "Download a voice in Settings"
+        case .voiceRequired: return "Choose an available voice in Settings"
         case .idle: return "Ready to read"
         case .capturing: return "Getting selected text…"
         case .preparing: return "Loading voice…"

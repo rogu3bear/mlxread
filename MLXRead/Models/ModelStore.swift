@@ -38,6 +38,16 @@ final class ModelStore {
         states[model.id] ?? .notDownloaded
     }
 
+    /// Cached model weights do not imply that a particular voice file is present.
+    func availability(for model: ModelInfo, voice: String?) -> SpeechState? {
+        guard state(for: model) == .downloaded else { return .modelRequired }
+        if model.supportsVoices {
+            guard let voice = voice ?? model.defaultVoice,
+                  availableVoices(for: model).contains(voice) else { return .voiceRequired }
+        }
+        return nil
+    }
+
     var isAnyModelDownloaded: Bool {
         ModelManifest.all.contains { state(for: $0) == .downloaded }
     }
@@ -166,10 +176,17 @@ final class ModelStore {
     func availableVoices(for model: ModelInfo) -> [String] {
         guard model.supportsVoices else { return [] }
         let voicesDir = directory(for: model).appendingPathComponent("voices")
-        let files = (try? FileManager.default.contentsOfDirectory(atPath: voicesDir.path)) ?? []
+        let files = (try? FileManager.default.contentsOfDirectory(
+            at: voicesDir, includingPropertiesForKeys: [.isRegularFileKey, .fileSizeKey]
+        )) ?? []
         return files
-            .filter { $0.hasSuffix(".safetensors") }
-            .map { String($0.dropLast(".safetensors".count)) }
+            .filter {
+                guard $0.pathExtension == "safetensors",
+                      let values = try? $0.resolvingSymlinksInPath().resourceValues(forKeys: [.isRegularFileKey, .fileSizeKey])
+                else { return false }
+                return values.isRegularFile == true && (values.fileSize ?? 0) > 0
+            }
+            .map { $0.deletingPathExtension().lastPathComponent }
             .sorted()
     }
 

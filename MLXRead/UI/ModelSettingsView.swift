@@ -51,7 +51,13 @@ struct ModelSettingsView: View {
                 Button("Cancel Download") { modelStore.cancelDownload(model) }
             }
         case .downloaded:
-            Label("Ready to use", systemImage: "checkmark.circle")
+            if settings.selectedModelID == model.id,
+               modelStore.availability(for: model, voice: settings.speechConfiguration.voice) == .voiceRequired {
+                Label("Saved voice unavailable", systemImage: "exclamationmark.triangle")
+                Text("Choose another available voice in Voice settings.")
+            } else {
+                Label("Ready to use", systemImage: "checkmark.circle")
+            }
             LabeledContent("Disk usage", value: format(bytes: modelStore.diskUsageBytes(for: model)))
             HStack(spacing: 16) {
                 if settings.selectedModelID != model.id {

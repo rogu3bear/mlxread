@@ -30,18 +30,21 @@ everything immediately.
 `SpeechCoordinator.state` (`SpeechState`) is the single source of truth:
 
 ```
-permissionRequired / modelRequired  (resting gates, recomputed when idle)
+permissionRequired / modelRequired / voiceRequired  (resting gates)
 idle ─⌥⎋─► capturing ─► preparing ─► generating ─► playing ─► idle
   ▲                                     │             │
   └──────── stopping ◄──── ⌥⎋ ──────────┴─────────────┘
-failed(error)  (any step; retained until the next read, model choice, or readiness change)
+failed(error)  (retained until the next read, voice/model choice, or readiness change)
 ```
 
 Availability refreshes compare the current permission/model gate with the
 previous one. Download progress and other unchanged updates retain a reading
-error; retrying or choosing another model can clear it explicitly. Voice
-choices are reconciled with the files on disk only after the model is downloaded,
-so a partial voice catalog cannot replace the saved choice.
+error; retrying or choosing another voice or model can clear it explicitly.
+Catalog refreshes never change the saved voice. Model readiness also checks
+the selected voice file, because an interrupted catalog can contain usable
+weights and some voices while the saved voice is missing. Settings shows the
+saved choice as unavailable and requires an explicit choice; reading and
+previewing stay gated until that voice arrives or another available voice is chosen.
 
 Every read gets a **generation UUID**. The UUID is checked:
 1. in the coordinator loop before each chunk is forwarded,

@@ -8,7 +8,7 @@ struct VoiceSettingsView: View {
     @State private var hasPreparedSample = false
 
     private var voice: VoiceOption {
-        VoiceOption(id: settings.selectedModel.supportsVoices ? settings.selectedVoice : "af_heart")
+        VoiceOption(id: settings.speechConfiguration.voice ?? "af_heart")
     }
 
     private var voices: [VoiceOption] {
@@ -16,6 +16,14 @@ struct VoiceSettingsView: View {
         return modelStore.availableVoices(for: settings.selectedModel)
             .map { VoiceOption(id: $0) }
             .sorted { $0.name.localizedStandardCompare($1.name) == .orderedAscending }
+    }
+
+    private var voiceOptions: [VoiceOption] {
+        voices.contains(where: { $0.id == voice.id }) ? voices : voices + [voice]
+    }
+
+    private var modelAvailability: SpeechState? {
+        modelStore.availability(for: settings.selectedModel, voice: settings.speechConfiguration.voice)
     }
 
     var body: some View {
@@ -33,7 +41,8 @@ struct VoiceSettingsView: View {
                 Text(settings.selectedModel.summary)
                     .foregroundStyle(.secondary)
 
-                if settings.selectedModel.supportsVoices, !voices.isEmpty {
+                if settings.selectedModel.supportsVoices,
+                   modelStore.state(for: settings.selectedModel) == .downloaded {
                     Picker("Language", selection: Binding(
                         get: { voice.languageCode },
                         set: { language in
@@ -44,13 +53,25 @@ struct VoiceSettingsView: View {
                     )) {
                         ForEach(languageOptions) { option in
                             Text(option.languageName).tag(option.languageCode)
+                                .disabled(!voices.contains(where: { $0.languageCode == option.languageCode }))
                         }
                     }
                     .help("Choose the language of the text you’ll be reading")
-                    Picker("Voice", selection: $settings.selectedVoice) {
-                        ForEach(voices.filter { $0.languageCode == voice.languageCode }) { option in
-                            Text(option.name).tag(option.id)
+                    Picker("Voice", selection: Binding(
+                        get: { voice.id }, set: { settings.selectedVoice = $0 }
+                    )) {
+                        ForEach(voiceOptions.filter { $0.languageCode == voice.languageCode }) { option in
+                            let available = voices.contains(where: { $0.id == option.id })
+                            Text(available ? option.name : "\(option.name) (unavailable)")
+                                .tag(option.id).disabled(!available)
                         }
+                    }
+                    if modelAvailability == .voiceRequired {
+                        Text(voices.isEmpty
+                             ? "No usable voice files were found. Open Models to move this download to Trash, then download it again."
+                             : "Your saved voice is unavailable in these model files. Choose an available voice or language above.")
+                            .foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
                     }
                 } else if !settings.selectedModel.supportsVoices {
                     LabeledContent("Language", value: "English")
@@ -110,7 +131,7 @@ struct VoiceSettingsView: View {
                     }
                     .buttonStyle(.borderedProminent)
                     .disabled(!coordinator.state.isBusy &&
-                              (modelStore.state(for: settings.selectedModel) != .downloaded ||
+                              (modelAvailability != nil ||
                                sampleText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty))
                     Button("Use sample text") { sampleText = voice.sampleText }
                         .disabled(coordinator.state.isBusy)
@@ -125,34 +146,24 @@ struct VoiceSettingsView: View {
         }
         .formStyle(.grouped)
         .onAppear {
-            reconcileVoice()
             if !hasPreparedSample {
                 sampleText = voice.sampleText
                 hasPreparedSample = true
             }
         }
         .onChange(of: settings.selectedModelID) { _, _ in
-            reconcileVoice()
             coordinator.refreshAvailability(clearFailure: true)
         }
         .onChange(of: voice.languageCode) { _, _ in sampleText = voice.sampleText }
-        .onChange(of: modelStore.state(for: settings.selectedModel)) { _, _ in
-            reconcileVoice()
-            coordinator.refreshAvailability()
+        .onChange(of: settings.selectedVoice) { _, _ in
+            coordinator.refreshAvailability(clearFailure: true)
         }
     }
 
     private var languageOptions: [VoiceOption] {
         var seen = Set<String>()
-        return voices.filter { seen.insert($0.languageCode).inserted }
+        return voiceOptions.filter { seen.insert($0.languageCode).inserted }
             .sorted { $0.languageName.localizedStandardCompare($1.languageName) == .orderedAscending }
-    }
-
-    private func reconcileVoice() {
-        settings.reconcileVoice(
-            availableVoices: voices.map(\.id),
-            downloadState: modelStore.state(for: settings.selectedModel)
-        )
     }
 
     @ViewBuilder
@@ -193,7 +204,7 @@ struct VoiceSettingsView: View {
                 .fixedSize(horizontal: false, vertical: true)
         } else if sampleText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
             Text("Enter a passage or use the sample text to preview this voice.")
-        } else if modelStore.state(for: settings.selectedModel) == .downloaded {
+        } else if modelAvailability == nil {
             Text("Ready to preview. Use Option–Escape to read text selected in another app.")
         }
     }
