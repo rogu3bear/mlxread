@@ -26,6 +26,8 @@
 	<string>14.0</string>
 	<key>LSUIElement</key>
 	<true/>
+	<key>LSMultipleInstancesProhibited</key>
+	<true/>
 	<key>NSHumanReadableCopyright</key>
 	<string>© 2026 James Auchterlonie. MIT licensed.</string>
 	<key>SUEnableAutomaticChecks</key>

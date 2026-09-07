@@ -31,6 +31,12 @@ Prefer a **stable** signing identity while developing: the macOS Accessibility
 macOS re-prompt for Accessibility every time. With a stable Apple Development
 identity, the grant persists across rebuilds.
 
+When testing against an installed release's existing permission, use its
+Developer ID identity and team. `script/build_and_run.sh` also accepts
+`CODE_SIGN_IDENTITY` and `CODE_SIGN_STYLE` overrides. Compare the new app's
+designated requirement with the installed release before expecting its grant
+to carry over; an ad hoc test build has a different identity.
+
 Debug builds keep hardened runtime off (needed for the debugger and XCTest
 injection). Release builds enable hardened runtime — required for notarization
 and, with a Developer ID signature, for stripping `get-task-allow`.
@@ -69,3 +75,8 @@ Changes to these deserve extra review (see `mlxread-threat-model.md`):
 Add unit tests for logic changes (`MLXReadTests/`). Integration tests that hit
 real models are opt-in (`script/test.sh --integration`). Run `script/test.sh`
 before opening a PR.
+
+Quit the running MLXRead app before starting Xcode tests: the app now prohibits
+duplicate launches. `script/build_and_run.sh` stops the running app before it
+builds and relaunches. Hosted unit tests skip the in-process launch gate so they
+can exercise an isolated lock fixture without reserving the production lock.

@@ -30,6 +30,17 @@ full text is in Sparkle's own `LICENSE`:
 |---|---|---|
 | Kokoro 82M (bf16) | [mlx-community/Kokoro-82M-bf16](https://huggingface.co/mlx-community/Kokoro-82M-bf16) | Apache-2.0 (upstream: hexgrad/Kokoro-82M) |
 | Soprano 80M (bf16) | [mlx-community/Soprano-80M-bf16](https://huggingface.co/mlx-community/Soprano-80M-bf16) | Apache-2.0 |
+| Qwen3-TTS 12Hz 1.7B CustomVoice (8-bit) | [mlx-community/Qwen3-TTS-12Hz-1.7B-CustomVoice-8bit](https://huggingface.co/mlx-community/Qwen3-TTS-12Hz-1.7B-CustomVoice-8bit) | Apache-2.0 — Qwen Team; MLX conversion by MLX Community |
+| Chatterbox Turbo fp16 | [mlx-community/chatterbox-turbo-fp16](https://huggingface.co/mlx-community/chatterbox-turbo-fp16) | Apache-2.0 as labeled by the MLX model card; original [Resemble AI model](https://huggingface.co/ResembleAI/chatterbox-turbo) is MIT |
+| S3TokenizerV2 | [mlx-community/S3TokenizerV2](https://huggingface.co/mlx-community/S3TokenizerV2) | Converted from [FunAudioLLM/CosyVoice2-0.5B](https://huggingface.co/FunAudioLLM/CosyVoice2-0.5B), Apache-2.0 upstream; conversion card supplies no separate license |
+| Pocket TTS | [mlx-community/pocket-tts](https://huggingface.co/mlx-community/pocket-tts) | CC-BY-4.0 — Kyutai; MLX conversion by Lucas Newman / MLX Community |
+
+Pocket's preset voice embeddings derive from Kyutai's published voice catalog.
+The [upstream voice catalog](https://huggingface.co/kyutai/tts-voices) provides
+individual credits and licenses, including Alba MacKenna's voice under
+CC-BY-4.0 and the Voice-Zero selections under CC0. MLXRead downloads the converted weights
+and embeddings without modifying them; model cards and credits are also linked
+from each model's details in Settings.
 
 Kokoro synthesis additionally downloads grapheme-to-phoneme assets on first
 use (fetched by mlx-audio-swift):

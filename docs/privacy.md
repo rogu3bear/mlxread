@@ -26,6 +26,9 @@ assets, deliver updates, and support users.
 The app can make these outbound requests:
 
 1. A user-started model snapshot download from Settings → Models.
+   Voice settings offers the same download action. Qwen, Pocket, and Chatterbox include
+   their required tokenizers/codecs and preset voice assets in that download; their inference path
+   loads only the local model directory.
 2. Kokoro pronunciation/G2P asset downloads on first synthesis, cached for
    later offline use.
 3. Sparkle update checks only in a release whose HTTPS feed and public key are

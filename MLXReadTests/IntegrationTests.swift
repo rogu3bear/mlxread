@@ -20,6 +20,26 @@ final class IntegrationTests: XCTestCase {
 
     // MARK: - Helpers
 
+    private func downloadedEngine(_ model: ModelInfo) async throws -> NativeMLXSpeechEngine {
+        let store = await MainActor.run { ModelStore() }
+        try await download(model, in: store)
+        return NativeMLXSpeechEngine(modelInfo: model)
+    }
+
+    private func download(_ model: ModelInfo, in store: ModelStore) async throws {
+        await MainActor.run { store.download(model) }
+        let deadline = ContinuousClock.now + .seconds(1800)
+        while await MainActor.run(body: { store.state(for: model).isBusy }) {
+            guard ContinuousClock.now < deadline else {
+                throw UserFacingSpeechError.modelDownloadFailed("download timed out")
+            }
+            try await Task.sleep(for: .milliseconds(100))
+        }
+        let state = await MainActor.run { store.state(for: model) }
+        if case .failed(let reason) = state { throw UserFacingSpeechError.modelDownloadFailed(reason) }
+        guard state == .downloaded else { throw UserFacingSpeechError.modelFilesIncomplete }
+    }
+
     private func collectChunks(
         engine: NativeMLXSpeechEngine,
         text: String,
@@ -45,7 +65,7 @@ final class IntegrationTests: XCTestCase {
     // MARK: - Soprano
 
     func testSopranoPrepareAndSynthesize() async throws {
-        let engine = NativeMLXSpeechEngine(modelInfo: ModelManifest.soprano)
+        let engine = try await downloadedEngine(ModelManifest.soprano)
         try await engine.prepare()
         let chunks = try await collectChunks(
             engine: engine,
@@ -57,7 +77,7 @@ final class IntegrationTests: XCTestCase {
     }
 
     func testSopranoRepeatedGenerationReusesModel() async throws {
-        let engine = NativeMLXSpeechEngine(modelInfo: ModelManifest.soprano)
+        let engine = try await downloadedEngine(ModelManifest.soprano)
         let start1 = ContinuousClock.now
         let first = try await collectChunks(engine: engine, text: "First pass.")
         let coldDuration = ContinuousClock.now - start1
@@ -72,7 +92,7 @@ final class IntegrationTests: XCTestCase {
     }
 
     func testSopranoCancellationStopsPromptly() async throws {
-        let engine = NativeMLXSpeechEngine(modelInfo: ModelManifest.soprano)
+        let engine = try await downloadedEngine(ModelManifest.soprano)
         try await engine.prepare()
         let longText = Array(
             repeating: "This is a long passage that keeps the model generating for a while.",
@@ -101,7 +121,7 @@ final class IntegrationTests: XCTestCase {
     // MARK: - Kokoro
 
     func testKokoroPrepareAndSynthesize() async throws {
-        let engine = NativeMLXSpeechEngine(modelInfo: ModelManifest.kokoro)
+        let engine = try await downloadedEngine(ModelManifest.kokoro)
         try await engine.prepare()
         let chunks = try await collectChunks(
             engine: engine,
@@ -114,7 +134,7 @@ final class IntegrationTests: XCTestCase {
     }
 
     func testKokoroNativeSpeedChangesDuration() async throws {
-        let engine = NativeMLXSpeechEngine(modelInfo: ModelManifest.kokoro)
+        let engine = try await downloadedEngine(ModelManifest.kokoro)
         let passage = VoiceOption(id: "af_heart").sampleText
         let normal = try await collectChunks(engine: engine, text: passage,
                                             configuration: SpeechConfiguration(voice: "af_heart", speed: 1.0))
@@ -136,7 +156,7 @@ final class IntegrationTests: XCTestCase {
     }
 
     func testKokoroChunkOrderingForMultiSentenceText() async throws {
-        let engine = NativeMLXSpeechEngine(modelInfo: ModelManifest.kokoro)
+        let engine = try await downloadedEngine(ModelManifest.kokoro)
         try await engine.prepare()
         let text = "First sentence for ordering.\n\nSecond paragraph follows here. And a third sentence to be safe."
         let chunks = try await collectChunks(engine: engine, text: text, configuration: SpeechConfiguration(voice: "af_heart"))
@@ -145,6 +165,87 @@ final class IntegrationTests: XCTestCase {
     }
 
     // MARK: - Model download (network)
+
+    func testChatterboxDownloadAndSynthesize() async throws {
+        let engine = try await downloadedEngine(ModelManifest.chatterbox)
+        let start = ContinuousClock.now
+        let chunks = try await collectChunks(
+            engine: engine, text: "A good book invites us to discover new ideas. Take a moment to listen.",
+            configuration: SpeechConfiguration(language: "en-US")
+        )
+        assertValidAudio(chunks, expectedRate: 24_000)
+        XCTAssertGreaterThan(chunks.reduce(0) { $0 + $1.duration }, 1)
+        print("MODEL_VERIFIED|chatterbox|chunks=\(chunks.count)|elapsed=\(ContinuousClock.now - start)")
+    }
+
+    func testEveryDownloadedVoiceProducesPreviewAudio() async throws {
+        for model in ModelManifest.all {
+            let engine = try await downloadedEngine(model)
+            let store = await MainActor.run { ModelStore() }
+            let voices = await MainActor.run { store.availableVoices(for: model) }
+            for voiceID in model.supportsVoices ? voices : ["default"] {
+                let voice = model.voiceOption(voiceID)
+                let requested = model.supportsIndependentLanguage && model.canRead(voice: voiceID, language: "en-US")
+                    ? "en-US" : voice.languageCode
+                let language = model.readingLanguage(voice: voiceID, requested: requested)
+                let chunks = try await collectChunks(
+                    engine: engine, text: VoiceOption.sampleText(language: language),
+                    configuration: SpeechConfiguration(voice: model.supportsVoices ? voiceID : nil, language: language)
+                )
+                assertValidAudio(chunks, expectedRate: model.nominalSampleRate)
+                print("VOICE_PREVIEW_VERIFIED|\(model.id)|\(voiceID)|\(language)|chunks=\(chunks.count)")
+            }
+            await engine.unload()
+        }
+    }
+
+    func testQwenDownloadAndSynthesize() async throws {
+        let engine = try await downloadedEngine(ModelManifest.qwen)
+        let start = ContinuousClock.now
+        let chunks = try await collectChunks(
+            engine: engine, text: "A good book invites us to discover new ideas. Take a moment to listen.",
+            configuration: SpeechConfiguration(voice: "ryan", language: "en-US")
+        )
+        assertValidAudio(chunks, expectedRate: 24_000)
+        XCTAssertGreaterThan(chunks.count, 1, "Qwen must deliver incremental audio")
+        XCTAssertGreaterThan(chunks.reduce(0) { $0 + $1.duration }, 1)
+        print("MODEL_VERIFIED|qwen|chunks=\(chunks.count)|elapsed=\(ContinuousClock.now - start)")
+    }
+
+    func testPocketDownloadAndSynthesize() async throws {
+        let engine = try await downloadedEngine(ModelManifest.pocket)
+        let start = ContinuousClock.now
+        let chunks = try await collectChunks(
+            engine: engine, text: "A good book invites us to discover new ideas. Take a moment to listen.",
+            configuration: SpeechConfiguration(voice: "alba")
+        )
+        assertValidAudio(chunks, expectedRate: 24_000)
+        XCTAssertGreaterThan(chunks.reduce(0) { $0 + $1.duration }, 1)
+        print("MODEL_VERIFIED|pocket|chunks=\(chunks.count)|elapsed=\(ContinuousClock.now - start)")
+    }
+
+    func testDownloadDeleteAndRedownloadInIsolatedLibrary() async throws {
+        // Real transport and files, without deleting the user's installed models.
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent("mlxread-model-cycle-\(UUID().uuidString)")
+        defer { try? FileManager.default.removeItem(at: root) }
+        let store = await MainActor.run { ModelStore(rootDirectory: root) }
+        let model = ModelManifest.pocket
+        try await download(model, in: store)
+        let firstSize = await MainActor.run { store.diskUsageBytes(for: model) }
+        XCTAssertGreaterThan(firstSize, 200_000_000)
+        try await store.remove(model)
+        let deleted = await MainActor.run {
+            store.state(for: model) == .notDownloaded && store.diskUsageBytes(for: model) == 0
+                && store.availability(for: model, voice: "alba") == .modelRequired
+        }
+        XCTAssertTrue(deleted)
+        try await download(model, in: store)
+        let restored = await MainActor.run {
+            store.state(for: model) == .downloaded && store.availability(for: model, voice: "alba") == nil
+        }
+        XCTAssertTrue(restored)
+        print("MODEL_VERIFIED|pocket-download-delete-redownload|deleted_bytes=\(firstSize)")
+    }
 
     func testModelDownloadStateMachine() async throws {
         // Runs against whatever is on disk: if absent this exercises a real

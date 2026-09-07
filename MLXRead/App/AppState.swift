@@ -10,6 +10,8 @@ final class AppSettings {
 
     var selectedModelID: String { didSet { defaults.set(selectedModelID, forKey: Constants.DefaultsKey.selectedModelID) } }
     var selectedVoice: String { didSet { defaults.set(selectedVoice, forKey: Constants.DefaultsKey.selectedVoice) } }
+    var selectedLanguage: String { didSet { defaults.set(selectedLanguage, forKey: "language.\(selectedModelID)") } }
+    var speechDelivery: SpeechDelivery { didSet { defaults.set(speechDelivery.rawValue, forKey: "speechDelivery") } }
     var speechSpeed: Double {
         didSet {
             let bounded = speechSpeed.isFinite ? min(max(speechSpeed, 0.5), 2.0) : 1.0
@@ -40,8 +42,11 @@ final class AppSettings {
 
     init(defaults: UserDefaults = .standard) {
         self.defaults = defaults
-        selectedModelID = defaults.string(forKey: Constants.DefaultsKey.selectedModelID) ?? ModelManifest.defaultModel.id
+        let initialModelID = defaults.string(forKey: Constants.DefaultsKey.selectedModelID) ?? ModelManifest.defaultModel.id
+        selectedModelID = initialModelID
         selectedVoice = defaults.string(forKey: Constants.DefaultsKey.selectedVoice) ?? (ModelManifest.defaultModel.defaultVoice ?? "")
+        selectedLanguage = defaults.string(forKey: "language.\(initialModelID)") ?? "en-US"
+        speechDelivery = SpeechDelivery(rawValue: defaults.string(forKey: "speechDelivery") ?? "") ?? .natural
         let speed = defaults.double(forKey: Constants.DefaultsKey.speechSpeed)
         speechSpeed = speed == 0 || !speed.isFinite ? Constants.Defaults.speechSpeed : min(max(speed, 0.5), 2.0)
         clipboardFallbackEnabled = defaults.object(forKey: Constants.DefaultsKey.clipboardFallbackEnabled) as? Bool ?? Constants.Defaults.clipboardFallbackEnabled
@@ -61,6 +66,7 @@ final class AppSettings {
         defaults.set(selectedVoice, forKey: "voice.\(selectedModelID)")
         selectedModelID = model.id
         selectedVoice = defaults.string(forKey: "voice.\(model.id)") ?? model.defaultVoice ?? ""
+        selectedLanguage = defaults.string(forKey: "language.\(model.id)") ?? model.languages.first ?? "en-US"
     }
 
     var speechConfiguration: SpeechConfiguration {
@@ -68,7 +74,8 @@ final class AppSettings {
         return SpeechConfiguration(
             voice: model.supportsVoices && !selectedVoice.isEmpty ? selectedVoice : model.defaultVoice,
             speed: speechSpeed,
-            language: nil
+            language: model.readingLanguage(voice: selectedVoice, requested: selectedLanguage),
+            delivery: speechDelivery
         )
     }
 }
@@ -79,10 +86,22 @@ extension Int {
     }
 }
 
-/// Keeps one live engine per model so the loaded model survives between reads.
+/// Keeps the most recently used model warm without retaining every download in RAM.
 @MainActor
 final class EngineCache {
-    var engines: [String: any SpeechEngine] = [:]
+    private(set) var engine: (any SpeechEngine)?
+
+    func engine(for model: ModelInfo) -> any SpeechEngine {
+        if let engine, engine.identifier == model.id { return engine }
+        let next = NativeMLXSpeechEngine(modelInfo: model)
+        engine = next
+        return next
+    }
+
+    func releaseUnavailableModels(in store: ModelStore) {
+        guard let engine, let info = ModelManifest.model(withID: engine.identifier) else { return }
+        if store.state(for: info) != .downloaded { self.engine = nil }
+    }
 }
 
 /// Composition root: builds and owns every service, exposes them to SwiftUI.
@@ -90,13 +109,10 @@ final class EngineCache {
 @Observable
 final class AppState {
     let settings: AppSettings
-    let permissions: AccessibilityPermissionService
+    let selectionAccess: SelectionAccessService
     let modelStore: ModelStore
     let coordinator: SpeechCoordinator
     let updates: UpdateService
-    private(set) var hotkeyInstalled = false
-
-    private var hotkey: GlobalHotkeyService?
     private let engineCache = EngineCache()
     private var memoryPressureSource: (any DispatchSourceMemoryPressure)?
 
@@ -107,7 +123,6 @@ final class AppState {
         ModelStore.bootstrapEnvironment()
         let settings = AppSettings()
         self.settings = settings
-        permissions = AccessibilityPermissionService()
         modelStore = ModelStore()
         updates = UpdateService()
         usesMockEngine = ProcessInfo.processInfo.environment["MLXREAD_ENGINE"] == "mock"
@@ -130,14 +145,16 @@ final class AppState {
             engineProvider: {
                 if let mock { return mock }
                 let model = ModelManifest.model(withID: settings.selectedModelID) ?? ModelManifest.defaultModel
-                if let cached = engineCache.engines[model.id] { return cached }
-                let engine = NativeMLXSpeechEngine(modelInfo: model)
-                engineCache.engines[model.id] = engine
-                return engine
+                return engineCache.engine(for: model)
             },
             configurationProvider: { settings.speechConfiguration },
             maximumLengthProvider: { settings.maximumSelectionLength }
         )
+
+        let speech = coordinator
+        selectionAccess = SelectionAccessService(hotkey: GlobalHotkeyService {
+            speech.toggle()
+        })
 
         wireAvailability()
         installMemoryPressureHandler()
@@ -148,69 +165,39 @@ final class AppState {
     private func wireAvailability() {
         coordinator.availabilityCheck = { [weak self] in
             guard let self else { return SpeechState.unavailable }
-            if !self.permissions.isTrusted { return .permissionRequired }
+            if !self.selectionAccess.isTrusted { return .permissionRequired }
             if !self.usesMockEngine {
                 return self.modelStore.availability(
-                    for: self.settings.selectedModel, voice: self.settings.speechConfiguration.voice
+                    for: self.settings.selectedModel, voice: self.settings.speechConfiguration.voice,
+                    language: self.settings.speechConfiguration.language
                 )
             }
             return nil
         }
         // A built-in preview needs model assets, but reads no other app's text.
-        coordinator.sampleAvailabilityCheck = { [weak self] in
+        coordinator.sampleAvailabilityCheck = { [weak self] configuration in
             guard let self else { return .unavailable }
             return self.usesMockEngine ? nil : self.modelStore.availability(
-                for: self.settings.selectedModel, voice: self.settings.speechConfiguration.voice
+                for: self.settings.selectedModel, voice: configuration.voice, language: configuration.language
             )
         }
         modelStore.onStateChange = { [weak self] in
-            self?.coordinator.refreshAvailability()
-        }
-        permissions.onChange = { [weak self] trusted in
             guard let self else { return }
-            if trusted {
-                self.installHotkeyIfPossible()
-            } else {
-                // Trust was revoked while running: the tap is now dead weight
-                // and any active read must stop cleanly.
-                self.teardownHotkey()
-                if self.coordinator.state.isBusy {
-                    self.coordinator.stop()
-                }
+            self.engineCache.releaseUnavailableModels(in: self.modelStore)
+            self.coordinator.refreshAvailability()
+        }
+        selectionAccess.onChange = { [weak self] trusted in
+            guard let self else { return }
+            if !trusted, self.coordinator.state.isBusy {
+                self.coordinator.stop()
             }
             self.coordinator.refreshAvailability()
         }
         coordinator.refreshAvailability()
     }
 
-    // MARK: - Hotkey lifecycle
-
-    func installHotkeyIfPossible() {
-        guard hotkey == nil, permissions.isTrusted else { return }
-        let coordinator = self.coordinator
-        let service = GlobalHotkeyService {
-            coordinator.toggle()
-        }
-        do {
-            try service.start()
-            hotkey = service
-            hotkeyInstalled = true
-            AppLogger.hotkey.info("Global shortcut installed")
-        } catch {
-            hotkeyInstalled = false
-            AppLogger.hotkey.error("Hotkey install failed despite trust; will retry on permission change")
-        }
-    }
-
-    func teardownHotkey() {
-        hotkey?.stop()
-        hotkey = nil
-        hotkeyInstalled = false
-    }
-
     func shutdown() {
-        permissions.stopMonitoring()
-        teardownHotkey()
+        selectionAccess.stopMonitoring()
     }
 
     // MARK: - Memory pressure
@@ -220,10 +207,8 @@ final class AppState {
         source.setEventHandler { [weak self] in
             guard let self, !self.coordinator.state.isBusy else { return }
             AppLogger.app.notice("Critical memory pressure: releasing model resources")
-            for engine in self.engineCache.engines.values {
-                if let native = engine as? NativeMLXSpeechEngine {
-                    Task { await native.unload() }
-                }
+            if let native = self.engineCache.engine as? NativeMLXSpeechEngine {
+                Task { await native.unload() }
             }
         }
         source.resume()

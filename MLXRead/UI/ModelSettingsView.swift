@@ -9,21 +9,25 @@ struct ModelSettingsView: View {
     var body: some View {
         Form {
             Section {
-                Text("Voices that stay on your Mac").font(.title2.weight(.semibold))
-                Text("Download a model to add local speech. One model is enough to get started.")
+                Text("Choose how your reading sounds").font(.title2.weight(.semibold))
+                Text("Download a model, then preview its voice. Downloads stay on this Mac and can be deleted at any time.")
+                    .fixedSize(horizontal: false, vertical: true)
+                LabeledContent("Downloaded", value: "\(downloadedCount) of \(ModelManifest.all.count) models")
             }
             ForEach(ModelManifest.all) { model in
                 Section(model.displayName) {
                     modelRow(model)
                 }
             }
-            Section {
+            Section("Storage") {
                 LabeledContent("Total disk usage", value: format(bytes: modelStore.totalDiskUsageBytes()))
-                Button("Show Downloaded Files in Finder") {
-                    modelStore.revealInFinder()
+                HStack {
+                    Button("Refresh Status") { modelStore.refreshAllStates() }
+                    Button("Show Files in Finder") { modelStore.revealInFinder() }
                 }
                 if let removalError {
-                    Text(removalError).fixedSize(horizontal: false, vertical: true)
+                    Label(removalError, systemImage: "exclamationmark.triangle")
+                        .fixedSize(horizontal: false, vertical: true)
                 }
             }
         }
@@ -32,62 +36,124 @@ struct ModelSettingsView: View {
         .onAppear { modelStore.refreshAllStates() }
     }
 
+    private var downloadedCount: Int {
+        ModelManifest.all.filter { modelStore.state(for: $0) == .downloaded }.count
+    }
+
     @ViewBuilder
     private func modelRow(_ model: ModelInfo) -> some View {
-        Text(model.summary)
+        let state = modelStore.state(for: model)
+        let selected = settings.selectedModelID == model.id
+        VStack(alignment: .leading, spacing: 10) {
+            Text(model.summary).fixedSize(horizontal: false, vertical: true)
+            HStack {
+                Label(status(for: model), systemImage: statusIcon(state))
+                Spacer()
+                if selected { Text("Selected").fontWeight(.medium) }
+            }
+            .accessibilityElement(children: .combine)
+            .accessibilityIdentifier("model-status-\(model.id)")
+
+            switch state {
+            case .notDownloaded:
+                Button("Download · \(model.downloadSize)") { modelStore.download(model) }
+                    .accessibilityLabel("Download \(model.displayName), about \(model.downloadSize)")
+            case .downloading(let fraction):
+                ProgressView(value: fraction) {
+                    Text("Downloading · \(Int(fraction * 100))%")
+                        .monospacedDigit()
+                }
+                HStack(spacing: 16) {
+                    Button("Cancel") { modelStore.cancelDownload(model) }
+                    deleteButton(model)
+                }
+            case .checking, .cancelling, .deleting:
+                ProgressView().controlSize(.small)
+            case .downloaded:
+                Text("On disk · \(format(bytes: modelStore.diskUsageBytes(for: model)))")
+                    .foregroundStyle(.secondary)
+                HStack(spacing: 16) {
+                    if !selected {
+                        Button("Use Model") {
+                            settings.selectModel(model)
+                            coordinator.refreshAvailability(clearFailure: true)
+                        }
+                        .disabled(coordinator.state.isBusy)
+                    }
+                    Button(selected && coordinator.state.isBusy ? "Stop" : "Preview") {
+                        if selected && coordinator.state.isBusy {
+                            coordinator.stop()
+                        } else {
+                            settings.selectModel(model)
+                            coordinator.refreshAvailability(clearFailure: true)
+                            let language = settings.speechConfiguration.language ?? model.voiceOption(settings.selectedVoice).languageCode
+                            coordinator.speakSample(VoiceOption.sampleText(language: language))
+                        }
+                    }
+                    .disabled(coordinator.state.isBusy && !selected)
+                    .accessibilityLabel("\(selected && coordinator.state.isBusy ? "Stop" : "Preview") \(model.displayName)")
+                    deleteButton(model)
+                }
+            case .incomplete, .failed:
+                Text("Some files are missing or the download did not finish. Retry to repair it, or delete the download.")
+                    .fixedSize(horizontal: false, vertical: true)
+                HStack(spacing: 16) {
+                    Button("Retry Download") { modelStore.download(model) }
+                    deleteButton(model)
+                }
+                if case .failed(let message) = state {
+                    DisclosureGroup("Error details") { Text(message).textSelection(.enabled) }
+                }
+            }
+            DisclosureGroup("Model details") {
+                LabeledContent("Download size", value: "About \(model.downloadSize)")
+                LabeledContent("Source", value: model.id).textSelection(.enabled)
+                LabeledContent("License", value: model.weightsLicense)
+                Link("Model card and credits", destination: URL(string: "https://huggingface.co/\(model.id)")!)
+                if model.id == ModelManifest.pocket.id {
+                    Link("Voice credits", destination: URL(string: "https://huggingface.co/kyutai/tts-voices")!)
+                }
+            }
+        }
+        .padding(.vertical, 4)
+    }
+
+    private func deleteButton(_ model: ModelInfo) -> some View {
+        Button("Delete", role: .destructive) {
+            Task {
+                do {
+                    try await modelStore.remove(model)
+                    removalError = nil
+                } catch {
+                    removalError = "Couldn’t delete \(model.displayName). \(error.localizedDescription)"
+                }
+            }
+        }
+        .disabled(settings.selectedModelID == model.id && coordinator.state.isBusy)
+        .accessibilityLabel("Delete \(model.displayName) download")
+        .help("Delete this model's downloaded files. You can download it again later.")
+    }
+
+    private func status(for model: ModelInfo) -> String {
+        let state = modelStore.state(for: model)
+        guard state == .downloaded else { return state.label }
         if settings.selectedModelID == model.id {
-            Label("Selected for reading", systemImage: "checkmark.circle")
+            if coordinator.state.isBusy { return coordinator.state.displayName }
+            if case .failed = coordinator.state { return "Speech failed · retry Preview" }
+            if modelStore.availability(for: model, voice: settings.speechConfiguration.voice,
+                                       language: settings.speechConfiguration.language) == .voiceRequired {
+                return "Choose a voice for this language in Voice settings"
+            }
         }
-        switch modelStore.state(for: model) {
-        case .notDownloaded:
-            Text("Download size: about \(model.approximateSizeMB) MB")
-                .foregroundStyle(.secondary)
-            Button("Download \(model.displayName)") { modelStore.download(model) }
-        case .downloading(let fraction):
-            VStack(alignment: .leading, spacing: 4) {
-                ProgressView(value: max(0.0, min(1.0, fraction))) {
-                    Text("Downloading… \(Int(fraction * 100))%")
-                }
-                Button("Cancel Download") { modelStore.cancelDownload(model) }
-            }
-        case .downloaded:
-            if settings.selectedModelID == model.id,
-               modelStore.availability(for: model, voice: settings.speechConfiguration.voice) == .voiceRequired {
-                Label("Saved voice unavailable", systemImage: "exclamationmark.triangle")
-                Text("Choose another available voice in Voice settings.")
-            } else {
-                Label("Ready to use", systemImage: "checkmark.circle")
-            }
-            LabeledContent("Disk usage", value: format(bytes: modelStore.diskUsageBytes(for: model)))
-            HStack(spacing: 16) {
-                if settings.selectedModelID != model.id {
-                    Button("Use for Reading") {
-                        settings.selectModel(model)
-                        coordinator.refreshAvailability(clearFailure: true)
-                    }
-                }
-                Button("Move to Trash", role: .destructive) {
-                    do {
-                        try modelStore.remove(model, movingToTrash: true)
-                        removalError = nil
-                        coordinator.refreshAvailability()
-                    } catch {
-                        removalError = "Couldn’t remove \(model.displayName). \(error.localizedDescription)"
-                    }
-                }
-            }
-            .disabled(coordinator.state.isBusy)
-            Text("Restore the folder from Trash or download it again to use this model later.")
-                .foregroundStyle(.secondary)
-        case .failed(let message):
-            Text("Download didn’t finish. Check your connection and try again.")
-            DisclosureGroup("Download details") { Text(message).textSelection(.enabled) }
-            Button("Retry Download") { modelStore.download(model) }
-        }
-        DisclosureGroup("Model details") {
-            LabeledContent("Source", value: model.id)
-                .textSelection(.enabled)
-            LabeledContent("License", value: model.weightsLicense)
+        return "Ready to preview"
+    }
+
+    private func statusIcon(_ state: ModelDownloadState) -> String {
+        switch state {
+        case .downloaded: return "checkmark.circle"
+        case .failed, .incomplete: return "exclamationmark.triangle"
+        case .deleting: return "trash"
+        default: return "arrow.down.circle"
         }
     }
 

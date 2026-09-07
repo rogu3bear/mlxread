@@ -2,9 +2,8 @@ import AppKit
 import SwiftUI
 
 struct OnboardingView: View {
-    @Environment(AccessibilityPermissionService.self) private var permissions
+    @Environment(SelectionAccessService.self) private var access
     @Environment(AppSettings.self) private var settings
-    @Environment(AppState.self) private var appState
     var dismiss: () -> Void
 
     var body: some View {
@@ -27,8 +26,8 @@ struct OnboardingView: View {
                 Label {
                     Text("Allow **Accessibility** access so MLXRead can read selected text and respond to Option–Escape. Your reading text stays on this Mac.")
                 } icon: {
-                    Image(systemName: permissions.isTrusted ? "checkmark.circle.fill" : "1.circle")
-                        .foregroundStyle(permissions.isTrusted ? .green : .primary)
+                    Image(systemName: access.isTrusted ? "checkmark.circle.fill" : "1.circle")
+                        .foregroundStyle(access.isTrusted ? .green : .primary)
                 }
 
                 Label {
@@ -49,37 +48,43 @@ struct OnboardingView: View {
             Divider()
 
             HStack {
-                if permissions.isTrusted {
+                if access.isTrusted {
                     Label("Accessibility granted", systemImage: "checkmark.circle.fill")
                         .foregroundStyle(.green)
                 } else {
                     Button("Grant Accessibility Access…") {
-                        permissions.requestAccess()
+                        access.requestAccess()
                     }
                     .buttonStyle(.borderedProminent)
                 }
                 Spacer()
-                Button("Close Setup") {
-                    settings.onboardingCompleted = true
-                    appState.installHotkeyIfPossible()
-                    dismiss()
-                }
+                Button("Close Setup", action: finishSetup)
                 .keyboardShortcut(.defaultAction)
             }
             SettingsLink { Text("Open Settings…") }
         }
         .padding(24)
         .frame(width: 560)
+        .onChange(of: access.isTrusted) { _, granted in
+            if granted { finishSetup() }
+        }
+    }
+
+    private func finishSetup() {
+        settings.onboardingCompleted = true
+        dismiss()
     }
 }
 
 @MainActor
 final class OnboardingWindowController {
-    private let appState: AppState
+    private let access: SelectionAccessService
+    private let settings: AppSettings
     private var window: NSWindow?
 
-    init(appState: AppState) {
-        self.appState = appState
+    init(access: SelectionAccessService, settings: AppSettings) {
+        self.access = access
+        self.settings = settings
     }
 
     func show() {
@@ -87,9 +92,8 @@ final class OnboardingWindowController {
             let view = OnboardingView { [weak self] in
                 self?.window?.close()
             }
-            .environment(appState.permissions)
-            .environment(appState.settings)
-            .environment(appState)
+            .environment(access)
+            .environment(settings)
 
             // Automatic SwiftUI window sizing must stay OFF here: on this
             // macOS build, the hosting view's window-resize during ordering

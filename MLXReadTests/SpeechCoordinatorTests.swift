@@ -56,6 +56,7 @@ actor GatedEngine: SpeechEngine {
 
     private(set) var prepareCount = 0
     private(set) var cancelCount = 0
+    private(set) var receivedConfigurations: [SpeechConfiguration] = []
     let chunkCount: Int
     let chunkDelay: Duration
 
@@ -77,6 +78,7 @@ actor GatedEngine: SpeechEngine {
         let delay = chunkDelay
         return AsyncThrowingStream { continuation in
             let task = Task {
+                await self.record(configuration)
                 for i in 0..<count {
                     do {
                         try await Task.sleep(for: delay)
@@ -96,6 +98,8 @@ actor GatedEngine: SpeechEngine {
     func cancel() async {
         cancelCount += 1
     }
+
+    private func record(_ configuration: SpeechConfiguration) { receivedConfigurations.append(configuration) }
 }
 
 // MARK: - Tests
@@ -152,13 +156,13 @@ final class SpeechCoordinatorTests: XCTestCase {
         let engine = GatedEngine(chunkCount: 1)
         let coordinator = makeCoordinator(engine: engine)
         coordinator.availabilityCheck = { .permissionRequired }
-        coordinator.sampleAvailabilityCheck = { .modelRequired }
+        coordinator.sampleAvailabilityCheck = { _ in .modelRequired }
         coordinator.speakSample("A local preview.")
         XCTAssertEqual(coordinator.state, .modelRequired)
         let prepareCount = await engine.prepareCount
         XCTAssertEqual(prepareCount, 0)
 
-        coordinator.sampleAvailabilityCheck = { nil }
+        coordinator.sampleAvailabilityCheck = { _ in nil }
         coordinator.speakSample("A local preview.")
         XCTAssertEqual(coordinator.state, .preparing)
         try await waitUntil { !coordinator.state.isBusy }
@@ -174,6 +178,30 @@ final class SpeechCoordinatorTests: XCTestCase {
         XCTAssertEqual(coordinator.state, .idle)
         let prepareCount = await engine.prepareCount
         XCTAssertEqual(prepareCount, 0)
+    }
+
+    func testPreviewUsesItsOwnVoiceThenReadingKeepsTheSavedVoice() async throws {
+        let engine = GatedEngine(chunkCount: 1)
+        let saved = SpeechConfiguration(voice: "ryan", language: "en-US", delivery: .natural)
+        let preview = SpeechConfiguration(voice: "aiden", language: "en-US", delivery: .narration)
+        let coordinator = SpeechCoordinator(
+            selection: FakeSelectionReader(), player: FakeAudioPlayer(),
+            engineProvider: { engine }, configurationProvider: { saved }
+        )
+        var checkedVoice: String?
+        coordinator.sampleAvailabilityCheck = { configuration in
+            checkedVoice = configuration.voice
+            return nil
+        }
+        coordinator.speakSample("Compare this voice.", configuration: preview)
+        XCTAssertEqual(checkedVoice, "aiden")
+        XCTAssertEqual(coordinator.activeConfiguration, preview)
+        try await waitUntil { !coordinator.state.isBusy }
+        coordinator.beginReadingSelection()
+        XCTAssertEqual(coordinator.activeConfiguration, saved)
+        try await waitUntil { !coordinator.state.isBusy }
+        let received = await engine.receivedConfigurations
+        XCTAssertEqual(received, [preview, saved])
     }
 
     func testNativeSpeedIsNotAppliedTwiceAndConfigurationIsFrozen() async throws {

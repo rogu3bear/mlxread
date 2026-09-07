@@ -31,8 +31,8 @@ struct DebugBundle: Sendable {
         voice = settings.selectedVoice.isEmpty ? "(model default)" : settings.selectedVoice
         speed = String(format: "%.2f×", settings.speechSpeed)
         modelState = String(describing: appState.modelStore.state(for: settings.selectedModel))
-        accessibilityTrusted = appState.permissions.isTrusted
-        hotkeyInstalled = appState.hotkeyInstalled
+        accessibilityTrusted = appState.selectionAccess.isTrusted
+        hotkeyInstalled = appState.selectionAccess.shortcutActive
         launchAtLogin = appState.launchAtLoginEnabled
     }
 
@@ -46,7 +46,7 @@ struct DebugBundle: Sendable {
         Model           \(model) · \(modelState)
         Voice / speed   \(voice) · \(speed)
         Accessibility   \(accessibilityTrusted ? "granted" : "not granted")
-        ⌥⎋ shortcut     \(hotkeyInstalled ? "installed" : "not installed")
+        ⌥⎋ shortcut     \(hotkeyInstalled ? "active" : "inactive")
         Launch at login \(launchAtLogin ? "on" : "off")
 
         Plus up to ~10 minutes of recent app logs — timings, counts, and error

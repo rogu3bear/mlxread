@@ -4,11 +4,32 @@ import Foundation
 enum ModelDownloadState: Equatable, Sendable {
     case notDownloaded
     case downloading(fraction: Double)
+    case checking
+    case cancelling
+    case deleting
     case downloaded
+    case incomplete
     case failed(String)
 
     var isDownloading: Bool {
-        if case .downloading = self { return true }
-        return false
+        switch self {
+        case .downloading, .checking, .cancelling: return true
+        default: return false
+        }
+    }
+
+    var isBusy: Bool { isDownloading || self == .deleting }
+
+    var label: String {
+        switch self {
+        case .notDownloaded: return "Not downloaded"
+        case .downloading: return "Downloading"
+        case .checking: return "Checking files"
+        case .cancelling: return "Cancelling download"
+        case .deleting: return "Deleting"
+        case .downloaded: return "Downloaded"
+        case .incomplete: return "Incomplete download"
+        case .failed: return "Download failed"
+        }
     }
 }

@@ -1,22 +1,18 @@
 import SwiftUI
 
 struct PermissionView: View {
-    @Environment(AccessibilityPermissionService.self) private var permissions
-    @Environment(AppState.self) private var appState
+    @Environment(SelectionAccessService.self) private var access
 
     var body: some View {
         Form {
             Section("Accessibility") {
                 LabeledContent("Permission") {
                     Label(
-                        permissions.isTrusted ? "Granted" : "Not granted",
-                        systemImage: permissions.isTrusted ? "checkmark.circle.fill" : "xmark.circle.fill"
+                        access.isTrusted ? "Granted" : "Not granted",
+                        systemImage: access.isTrusted ? "checkmark.circle.fill" : "xmark.circle.fill"
                     )
                 }
 
-                // Trust and "tap actually installed" are distinct: the app
-                // can be trusted yet fail to install the tap (rare), and the
-                // user should see the true operational state.
                 LabeledContent("Global shortcut ⌥⎋") {
                     Label(
                         shortcutStatus.text,
@@ -26,20 +22,21 @@ struct PermissionView: View {
 
                 Text("Allow MLXRead to read selected text in other apps and respond to Option–Escape. Your reading text stays on this Mac.")
 
-                if !permissions.isTrusted {
+                if !access.isTrusted {
+                    Text("Enable MLXRead in System Settings. Access is detected automatically.")
                     Text("You can turn access off in System Settings at any time. MLXRead then stops reading and disables its shortcut.")
                         .foregroundStyle(.secondary)
                 }
 
                 HStack {
-                    if !permissions.isTrusted {
-                        Button("Grant Access…") { permissions.requestAccess() }
+                    if !access.isTrusted {
+                        Button("Grant Access…") { access.requestAccess() }
                             .buttonStyle(.borderedProminent)
+                    } else {
+                        Button("Open Accessibility Settings") { access.openSystemSettings() }
                     }
-                    Button("Open Accessibility Settings") { permissions.openSystemSettings() }
-                    Button("Recheck") {
-                        permissions.refresh()
-                        appState.installHotkeyIfPossible()
+                    if access.shortcutNeedsRetry {
+                        Button("Retry Shortcut") { access.retryShortcut() }
                     }
                 }
             }
@@ -49,12 +46,14 @@ struct PermissionView: View {
     }
 
     private var shortcutStatus: (text: String, symbol: String) {
-        if !permissions.isTrusted {
+        if !access.isTrusted {
             return ("Needs Accessibility access", "xmark.circle.fill")
         }
-        if appState.hotkeyInstalled {
+        if access.shortcutActive {
             return ("Active", "checkmark.circle.fill")
         }
-        return ("Not active — click Recheck", "exclamationmark.triangle.fill")
+        return access.shortcutNeedsRetry
+            ? ("Unavailable — retry below", "exclamationmark.triangle.fill")
+            : ("Starting…", "clock")
     }
 }

@@ -1,7 +1,118 @@
 # Testing
 
-All results below were produced on 2026-07-11 on this machine: Apple Silicon
+The original baseline below was produced on 2026-07-11 on this machine: Apple Silicon
 (arm64), macOS 26.5.2, Xcode 26.6 (SDK macOS 26.5).
+
+## Menu bar loading ring — 2026-09-07
+
+Native menu bar screenshots during a Pocket voice preview showed five distinct
+arc positions while speech was being prepared, followed by the filled speaking
+icon when audio started. The menu stayed closed throughout. A later **Stop
+preview** during preparation returned to readiness in 27 ms without starting
+playback. The selected Pocket/Alba reading voice was retained.
+
+The ring uses timer-driven template images; `TimelineView` caused a repeating
+menu bar image update on this host and was removed. The timer subscription only
+exists in the animated loading branch. Reduce Motion selects a stationary ring;
+the system preference was not changed during verification.
+
+The signed native unit suite executed **103 tests: 89 passed, 14 opt-in tests
+skipped, 0 failures**. The temporary screenshot-capture test was removed after
+use. These checks used the development app and did not replace the installed
+application or change Accessibility permission.
+
+## Duplicate-launch guard — 2026-09-07
+
+The signed native unit run (`script/test.sh`) executed **103 tests: 89 passed,
+14 opt-in integration/benchmark tests skipped, 0 failures**. Lock tests exercised
+exclusive ownership, reacquisition after release, a leftover file without a live
+lock, and filesystem failure. The signed development build passed launch and
+deep strict signature verification.
+
+Normal reopen, `open -n`, opening a second copy of the updated app, and direct
+executions of both copies all left the original process as the sole instance.
+Six simultaneous direct launches across two copies produced one survivor and
+five clean exits. Force-killing that survivor allowed a subsequent launch to
+acquire the existing lock file without deleting it. The normal development app
+was then reopened and its Settings controls verified. The temporary app copy
+was unregistered and removed.
+
+An explicit installed-copy check found the version boundary: the updated build
+refuses to start when the older installed app is already running, but that older
+binary can still start alongside the updated build. Updating the installed copy
+is therefore required for the normal Applications-folder launch path. These
+checks did not replace the installed app or change Accessibility permission.
+
+## Voice library and English handling — 2026-09-07
+
+On the same M4 Max host described below, the signed native suite executed
+99 tests: **97 passed, 2 opt-in benchmarks skipped, 0 failures**. The run used
+the `script/test.sh --integration` Xcode arguments and skipped only
+`testDownloadDeleteAndRedownloadInIsolatedLibrary`, which had already passed
+in the preceding run. That first run was interrupted by an orderly app Quit
+during the voice sweep; its overall result was failed. The complete voice sweep
+was rerun successfully after that interruption.
+
+- Every downloaded voice produced finite, non-silent PCM: **73 voices** across
+  Chatterbox Turbo (1), Kokoro (54), Qwen (9), Pocket (8), and Soprano (1).
+  Kokoro used each voice's native-language sample. Qwen used English for seven
+  voices and Chinese for its two dialect-bound voices, Dylan and Eric.
+- Chatterbox's download included its required S3 codec. Its real local synthesis
+  produced 24 kHz audio; fixture tests also exercised missing-codec validation
+  and deletion of all required components.
+- Coordinator tests verified that auditioning another voice uses its requested
+  configuration while the following reading retains the saved voice. Settings
+  tests covered explicit English, persisted delivery, and rejection of the two
+  Qwen dialect voices for English reading.
+
+In the signed Debug app, Aiden's Preview reached playback while Sohee remained
+selected. **Use Aiden** changed the saved voice; previewing Ryan with **Narration**
+then left Aiden selected. Search filtered by voice name and language, and Kokoro's
+**All languages** view exposed all 54 preview buttons. Chatterbox's Preview
+completed, its Stop button returned to readiness, and Models reported its full
+3.48 GB download ready. Screens were inspected in dark appearance. A final native
+build verified the shorter explanatory copy and the single-voice layout.
+
+These checks establish working audio generation, not listening preference or
+pronunciation accuracy. They do not cover every Qwen voice/language/delivery
+combination. Networking was available for first-use pronunciation assets.
+The work was verified in the development app; the installed application was not
+replaced, and no Accessibility permission was changed.
+
+## Model catalog follow-up — 2026-09-07
+
+Verified on an Apple M4 Max with 48 GB RAM, macOS 26.6.2, and Xcode 26.6.
+The combined unit and real-model suite (`script/test.sh --integration`) executed
+94 tests: **92 passed, 2 opt-in benchmarks skipped, 0 failures**. This covers the
+existing Kokoro/Soprano paths plus Qwen3-TTS 1.7B CustomVoice 8-bit and Pocket TTS.
+
+- Real Qwen and Pocket downloads loaded from the app's model directory and
+  produced finite, non-silent audio. Qwen emitted 16 audio chunks; Pocket emitted
+  one buffer for the test passage. Their single-run synthesis times were 8.67 s
+  and 1.02 s respectively; these are test observations, not comparative benchmarks.
+- An isolated temporary library exercised Pocket download → delete → redownload.
+  Deletion removed about 240 MB and made the model unavailable before redownload.
+- Controlled transport tests exercised cancellation, deletion while a cancelled
+  writer was still finishing, retry, and rejection of stale progress updates.
+  Other tests cover required tokenizer/voice files, saved choices per model,
+  Qwen's independent reading language, and eviction of deleted or replaced engines.
+
+The signed Debug app was then exercised through its visible Settings controls:
+
+- Reopening the running menu-bar app opened Settings. Models and Voice were
+  inspected in dark appearance; the catalog, status, sizes, and controls were legible.
+- Qwen and Pocket **Preview** each reached `Speaking` and returned to readiness.
+- Pocket **Delete** changed its row to **Not downloaded**, reduced the total from
+  4.51 GB to 4.27 GB, and removed both its model directory and legacy cache path.
+  **Download** displayed percentage progress, then returned to **Ready to preview**
+  at 240.4 MB. Preview reached playback again after this fresh download.
+- Pocket's picker exposed all eight voices, Qwen exposed separate language and
+  voice controls, and returning to Kokoro restored the saved Aoede voice at 1×.
+
+The new models remained downloaded. This pass used the development build and
+did not replace the installed application. It did not exercise every Qwen
+voice/language combination or judge subjective voice quality. Networking was
+available; physically disconnected operation remains a separate manual check.
 
 ## Automated suites
 

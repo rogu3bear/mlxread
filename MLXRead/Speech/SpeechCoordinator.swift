@@ -27,7 +27,7 @@ final class SpeechCoordinator {
     private let maximumLengthProvider: () -> Int
     /// External availability gates (permission, model present).
     var availabilityCheck: () -> SpeechState? = { nil }
-    var sampleAvailabilityCheck: () -> SpeechState? = { nil }
+    var sampleAvailabilityCheck: (SpeechConfiguration) -> SpeechState? = { _ in nil }
 
     private var currentGeneration: UUID?
     private var readingTask: Task<Void, Never>?
@@ -84,14 +84,15 @@ final class SpeechCoordinator {
     }
 
     /// Settings "test phrase" playback; skips selection capture.
-    func speakSample(_ text: String) {
+    func speakSample(_ text: String, configuration: SpeechConfiguration? = nil) {
         guard !state.isBusy else { return }
         guard !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
-        if let gated = sampleAvailabilityCheck() {
+        let configuration = configuration ?? configurationProvider()
+        if let gated = sampleAvailabilityCheck(configuration) {
             state = gated
             return
         }
-        startReading(source: .fixedText(text))
+        startReading(source: .fixedText(text), configuration: configuration)
     }
 
     func stop() {
@@ -123,12 +124,12 @@ final class SpeechCoordinator {
         case fixedText(String)
     }
 
-    private func startReading(source: ReadingSource) {
+    private func startReading(source: ReadingSource, configuration: SpeechConfiguration? = nil) {
         lastReadWasTruncated = false
         lastAvailability = availabilityCheck()
         let generation = UUID()
         currentGeneration = generation
-        activeConfiguration = configurationProvider()
+        activeConfiguration = configuration ?? configurationProvider()
         activeEngine = engineProvider()
         switch source {
         case .selectionCapture: state = .capturing

@@ -4,7 +4,7 @@ struct MenuBarContent: View {
     @Environment(SpeechCoordinator.self) private var coordinator
     @Environment(AppSettings.self) private var settings
     @Environment(ModelStore.self) private var modelStore
-    @Environment(AccessibilityPermissionService.self) private var permissions
+    @Environment(SelectionAccessService.self) private var permissions
     @Environment(UpdateService.self) private var updates
     @Environment(AppState.self) private var appState
 

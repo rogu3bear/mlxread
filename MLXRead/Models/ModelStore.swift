@@ -1,16 +1,9 @@
 import Foundation
 import HuggingFace
-import MLXAudioCore
 import Observation
 
-/// Owns model assets on disk: download (single-flight, with progress),
-/// validation, removal, disk usage. Loading/keeping models warm is the speech
-/// engine's job; the store only manages files.
-///
-/// Cache layout is mlx-audio's: `<root>/mlx-audio/<owner>_<repo>/…`.
-/// `Self.bootstrapEnvironment()` points `HF_HUB_CACHE` at our root before
-/// anything touches `HubCache.default`, because parts of mlx-audio-swift
-/// (Kokoro G2P asset downloads) hardcode the default cache.
+/// Owns model files, download/delete operations, and their observable status.
+/// The speech engine owns loaded models; the store never synthesizes text.
 @MainActor
 @Observable
 final class ModelStore {
@@ -19,31 +12,34 @@ final class ModelStore {
         didSet { onStateChange?() }
     }
     var onStateChange: (() -> Void)?
-    private var downloadTasks: [String: Task<Void, Never>] = [:]
+    private var downloadTasks: [String: (id: UUID, task: Task<Void, Never>)] = [:]
+    private let downloader: any ModelDownloading
 
-    /// Must run before any HubCache.default access anywhere in the process.
+    /// Kokoro's pronunciation loader uses HubCache.default. Set this before
+    /// any cache access so those assets stay in the app's models folder too.
     nonisolated static func bootstrapEnvironment(rootDirectory: URL = Constants.modelsDirectory) {
         try? FileManager.default.createDirectory(at: rootDirectory, withIntermediateDirectories: true)
         setenv("HF_HUB_CACHE", rootDirectory.path, 1)
     }
 
-    init(rootDirectory: URL = Constants.modelsDirectory) {
+    init(rootDirectory: URL = Constants.modelsDirectory, downloader: any ModelDownloading = HubModelDownloader()) {
         self.rootDirectory = rootDirectory
+        self.downloader = downloader
         refreshAllStates()
     }
-
-    // MARK: - State
 
     func state(for model: ModelInfo) -> ModelDownloadState {
         states[model.id] ?? .notDownloaded
     }
 
-    /// Cached model weights do not imply that a particular voice file is present.
-    func availability(for model: ModelInfo, voice: String?) -> SpeechState? {
+    func availability(for model: ModelInfo, voice: String?, language: String? = nil) -> SpeechState? {
         guard state(for: model) == .downloaded else { return .modelRequired }
         if model.supportsVoices {
             guard let voice = voice ?? model.defaultVoice,
                   availableVoices(for: model).contains(voice) else { return .voiceRequired }
+            guard model.canRead(voice: voice, language: model.readingLanguage(voice: voice, requested: language)) else {
+                return .voiceRequired
+            }
         }
         return nil
     }
@@ -53,155 +49,160 @@ final class ModelStore {
     }
 
     func refreshAllStates() {
-        for model in ModelManifest.all where !(states[model.id]?.isDownloading ?? false) {
-            states[model.id] = validate(model) ? .downloaded : .notDownloaded
+        for model in ModelManifest.all where !(states[model.id]?.isBusy ?? false) {
+            let current = diskState(for: model)
+            // Preserve an actionable network error until retry or completion.
+            if case .failed = states[model.id], current != .downloaded { continue }
+            states[model.id] = current
         }
+    }
+
+    private func diskState(for model: ModelInfo) -> ModelDownloadState {
+        if validate(model) { return .downloaded }
+        return diskUsageBytes(for: model) > 0 ? .incomplete : .notDownloaded
     }
 
     func directory(for model: ModelInfo) -> URL {
         rootDirectory.appendingPathComponent(model.cacheSubdirectory, isDirectory: true)
     }
 
-    /// A model is complete when config.json parses and at least one non-empty
-    /// weights file exists (plus voices/ for voice models).
+    /// Required tokenizers and voices differ by model. We validate them before
+    /// offering a preview; synthesis errors still belong to the speech engine.
     func validate(_ model: ModelInfo) -> Bool {
-        let dir = directory(for: model)
-        let fm = FileManager.default
-        let configURL = dir.appendingPathComponent("config.json")
-        guard let data = try? Data(contentsOf: configURL),
-              (try? JSONSerialization.jsonObject(with: data)) != nil
-        else { return false }
-        guard let files = try? fm.contentsOfDirectory(at: dir, includingPropertiesForKeys: [.fileSizeKey]) else {
+        guard model.downloads.allSatisfy({ validate($0) }) else { return false }
+        return !model.supportsVoices || !availableVoices(for: model).isEmpty
+    }
+
+    private func validate(_ asset: ModelAsset) -> Bool {
+        let dir = rootDirectory.appendingPathComponent(asset.cacheSubdirectory)
+        guard validJSON(dir.appendingPathComponent("config.json")),
+              let files = try? FileManager.default.contentsOfDirectory(at: dir, includingPropertiesForKeys: nil),
+              files.contains(where: { $0.pathExtension == "safetensors" && isNonemptyFile($0) }) else {
             return false
         }
-        let hasWeights = files.contains { url in
-            url.pathExtension == "safetensors"
-                && ((try? url.resourceValues(forKeys: [.fileSizeKey]))?.fileSize ?? 0) > 0
-        }
-        guard hasWeights else { return false }
-        if model.supportsVoices {
-            let voicesDir = dir.appendingPathComponent("voices")
-            let voices = (try? fm.contentsOfDirectory(atPath: voicesDir.path)) ?? []
-            guard voices.contains(where: { $0.hasSuffix(".safetensors") }) else { return false }
+        for path in asset.requiredFiles {
+            let file = dir.appendingPathComponent(path)
+            guard isNonemptyFile(file) else { return false }
+            if file.pathExtension == "json", !validJSON(file) { return false }
         }
         return true
     }
 
-    // MARK: - Download
+    // MARK: - Download and deletion
 
-    /// Starts (or joins) the download for `model`. Single-flight per model.
     func download(_ model: ModelInfo) {
-        guard downloadTasks[model.id] == nil else { return }
+        guard downloadTasks[model.id] == nil, !state(for: model).isBusy,
+              state(for: model) != .downloaded else { return }
         states[model.id] = .downloading(fraction: 0)
         AppLogger.models.info("Starting download of \(model.id)")
-
-        let cache = HubCache(cacheDirectory: rootDirectory)
-        let modelID = model.id
-        downloadTasks[model.id] = Task { [weak self] in
+        let destination = directory(for: model)
+        let downloader = self.downloader
+        let operationID = UUID()
+        let task = Task { [weak self] in
+            defer {
+                if self?.downloadTasks[model.id]?.id == operationID { self?.downloadTasks[model.id] = nil }
+            }
             do {
-                guard let repoID = Repo.ID(rawValue: modelID) else {
-                    throw UserFacingSpeechError.modelDownloadFailed("invalid repo ID")
+                try await downloader.download(model, to: destination) { [weak self] fraction in
+                    guard let self, self.downloadTasks[model.id]?.id == operationID,
+                          case .downloading = self.states[model.id] else { return }
+                    self.states[model.id] = .downloading(fraction: fraction.isFinite ? min(max(fraction, 0), 1) : 0)
                 }
-                _ = try await ModelUtils.resolveOrDownloadModel(
-                    client: HubClient(cache: cache),
-                    cache: cache,
-                    repoID: repoID,
-                    requiredExtension: "safetensors",
-                    additionalMatchingPatterns: [],
-                    progressHandler: { [weak self] progress in
-                        self?.noteProgress(modelID: modelID, fraction: progress.fractionCompleted)
-                    }
-                )
-                await MainActor.run { [weak self] in
-                    guard let self else { return }
-                    self.downloadTasks[modelID] = nil
-                    if let info = ModelManifest.model(withID: modelID), self.validate(info) {
-                        self.states[modelID] = .downloaded
-                        AppLogger.models.info("Download of \(modelID) complete")
-                    } else {
-                        self.states[modelID] = .failed(UserFacingSpeechError.modelFilesIncomplete.errorDescription ?? "incomplete")
-                        AppLogger.models.error("Download of \(modelID) finished but validation failed")
-                    }
-                }
+                try Task.checkCancellation()
+                guard let self, self.states[model.id] != .deleting else { return }
+                self.states[model.id] = .checking
+                guard self.validate(model) else { throw UserFacingSpeechError.modelFilesIncomplete }
+                self.states[model.id] = .downloaded
+                AppLogger.models.info("Download of \(model.id) complete")
             } catch {
-                await MainActor.run { [weak self] in
-                    guard let self else { return }
-                    self.downloadTasks[modelID] = nil
-                    if error is CancellationError {
-                        self.states[modelID] = self.validate(ModelManifest.model(withID: modelID) ?? model) ? .downloaded : .notDownloaded
-                    } else {
-                        AppLogger.models.error("Download of \(modelID) failed: \(error.localizedDescription)")
-                        self.states[modelID] = .failed(error.localizedDescription)
-                    }
+                guard let self, self.states[model.id] != .deleting else { return }
+                if Task.isCancelled || error is CancellationError {
+                    self.states[model.id] = self.diskState(for: model)
+                } else {
+                    self.states[model.id] = .failed(error.localizedDescription)
                 }
             }
         }
-    }
-
-    private func noteProgress(modelID: String, fraction: Double) {
-        if case .downloading = states[modelID] ?? .notDownloaded {
-            states[modelID] = .downloading(fraction: fraction)
-        }
+        downloadTasks[model.id] = (operationID, task)
     }
 
     func cancelDownload(_ model: ModelInfo) {
-        downloadTasks[model.id]?.cancel()
+        guard let task = downloadTasks[model.id], state(for: model) != .deleting else { return }
+        states[model.id] = .cancelling
+        task.task.cancel()
     }
 
-    // MARK: - Removal & inspection
-
-    func remove(_ model: ModelInfo, movingToTrash: Bool = false) throws {
-        cancelDownload(model)
-        let dir = directory(for: model)
-        if FileManager.default.fileExists(atPath: dir.path) {
-            if movingToTrash {
-                try FileManager.default.trashItem(at: dir, resultingItemURL: nil)
-            } else {
-                try FileManager.default.removeItem(at: dir)
-            }
+    func remove(_ model: ModelInfo, movingToTrash: Bool = false) async throws {
+        guard state(for: model) != .deleting else { return }
+        states[model.id] = .deleting
+        // Cancellation is not completion. Join the writer before deleting so
+        // it cannot recreate files or publish a stale downloaded state.
+        if let task = downloadTasks[model.id] {
+            task.task.cancel()
+            await task.task.value
         }
-        states[model.id] = .notDownloaded
-        AppLogger.models.info("Removed model \(model.id)")
+        do {
+            for dir in ownedDirectories(for: model) {
+                if FileManager.default.fileExists(atPath: dir.path) {
+                    if movingToTrash {
+                        try FileManager.default.trashItem(at: dir, resultingItemURL: nil)
+                    } else {
+                        try FileManager.default.removeItem(at: dir)
+                    }
+                }
+            }
+            states[model.id] = .notDownloaded
+            AppLogger.models.info("Removed model \(model.id)")
+        } catch {
+            states[model.id] = diskState(for: model)
+            throw error
+        }
+    }
+
+    // MARK: - Voices and disk usage
+
+    func availableVoices(for model: ModelInfo) -> [String] {
+        if case .presets(let voices) = model.voiceCatalog { return voices.map(\.id) }
+        guard let subdirectory = model.voiceCatalog.directory else { return [] }
+        let voicesDir = directory(for: model).appendingPathComponent(subdirectory)
+        let files = (try? FileManager.default.contentsOfDirectory(at: voicesDir, includingPropertiesForKeys: nil)) ?? []
+        return files.filter { $0.pathExtension == "safetensors" && isNonemptyFile($0) }
+            .map { $0.deletingPathExtension().lastPathComponent }.sorted()
     }
 
     func diskUsageBytes(for model: ModelInfo) -> Int64 {
-        directorySize(directory(for: model))
+        ownedDirectories(for: model).reduce(0) { $0 + directorySize($1) }
     }
 
-    func totalDiskUsageBytes() -> Int64 {
-        directorySize(rootDirectory)
+    func totalDiskUsageBytes() -> Int64 { directorySize(rootDirectory) }
+
+    func revealInFinder() { NSWorkspaceProxy.reveal(rootDirectory) }
+
+    private func ownedDirectories(for model: ModelInfo) -> [URL] {
+        model.downloads.flatMap { asset in
+            [rootDirectory.appendingPathComponent(asset.cacheSubdirectory),
+             HubCache(cacheDirectory: rootDirectory).repoDirectory(repo: Repo.ID(rawValue: asset.id)!, kind: .model)]
+        }
     }
 
-    /// Voice names discovered on disk (Kokoro: voices/<name>.safetensors).
-    func availableVoices(for model: ModelInfo) -> [String] {
-        guard model.supportsVoices else { return [] }
-        let voicesDir = directory(for: model).appendingPathComponent("voices")
-        let files = (try? FileManager.default.contentsOfDirectory(
-            at: voicesDir, includingPropertiesForKeys: [.isRegularFileKey, .fileSizeKey]
-        )) ?? []
-        return files
-            .filter {
-                guard $0.pathExtension == "safetensors",
-                      let values = try? $0.resolvingSymlinksInPath().resourceValues(forKeys: [.isRegularFileKey, .fileSizeKey])
-                else { return false }
-                return values.isRegularFile == true && (values.fileSize ?? 0) > 0
-            }
-            .map { $0.deletingPathExtension().lastPathComponent }
-            .sorted()
+    private func validJSON(_ file: URL) -> Bool {
+        guard let data = try? Data(contentsOf: file) else { return false }
+        return (try? JSONSerialization.jsonObject(with: data)) is [String: Any]
     }
 
-    func revealInFinder() {
-        NSWorkspaceProxy.reveal(rootDirectory)
+    private func isNonemptyFile(_ file: URL) -> Bool {
+        guard let values = try? file.resolvingSymlinksInPath()
+            .resourceValues(forKeys: [.isRegularFileKey, .fileSizeKey]) else { return false }
+        return values.isRegularFile == true && (values.fileSize ?? 0) > 0
     }
 
     private nonisolated func directorySize(_ url: URL) -> Int64 {
         guard let enumerator = FileManager.default.enumerator(
-            at: url,
-            includingPropertiesForKeys: [.totalFileAllocatedSizeKey, .isRegularFileKey]
+            at: url, includingPropertiesForKeys: [.totalFileAllocatedSizeKey, .isRegularFileKey]
         ) else { return 0 }
         var total: Int64 = 0
-        for case let fileURL as URL in enumerator {
-            guard let values = try? fileURL.resourceValues(forKeys: [.totalFileAllocatedSizeKey, .isRegularFileKey]),
+        for case let file as URL in enumerator {
+            guard let values = try? file.resourceValues(forKeys: [.totalFileAllocatedSizeKey, .isRegularFileKey]),
                   values.isRegularFile == true else { continue }
             total += Int64(values.totalFileAllocatedSize ?? 0)
         }
@@ -209,7 +210,41 @@ final class ModelStore {
     }
 }
 
-/// Small indirection so ModelStore stays importable in unit tests without AppKit.
+protocol ModelDownloading: Sendable {
+    func download(_ model: ModelInfo, to directory: URL,
+                  progress: @escaping @MainActor @Sendable (Double) -> Void) async throws
+}
+
+struct HubModelDownloader: ModelDownloading {
+    func download(_ model: ModelInfo, to directory: URL,
+                  progress: @escaping @MainActor @Sendable (Double) -> Void) async throws {
+        // The pinned Hub client requires a cache even with a destination.
+        // It copies resolved files into the destination, so its extra cached
+        // weights can be removed after successful completion.
+        let root = directory.deletingLastPathComponent().deletingLastPathComponent()
+        let cache = HubCache(cacheDirectory: root)
+        let totalSize = Double(model.downloads.reduce(0) { $0 + $1.approximateSizeMB })
+        var completedSize = 0.0
+        for asset in model.downloads {
+            try Task.checkCancellation()
+            guard let repo = Repo.ID(rawValue: asset.id) else {
+                throw UserFacingSpeechError.modelDownloadFailed("invalid repository ID")
+            }
+            let completed = completedSize
+            _ = try await HubClient(cache: cache).downloadSnapshot(
+                of: repo, to: root.appendingPathComponent(asset.cacheSubdirectory),
+                matching: ["*.safetensors", "*.json", "*.txt", "*.wav"],
+                progressHandler: { value in
+                    progress((completed + value.fractionCompleted * Double(asset.approximateSizeMB)) / totalSize)
+                }
+            )
+            try? FileManager.default.removeItem(at: cache.repoDirectory(repo: repo, kind: .model))
+            completedSize += Double(asset.approximateSizeMB)
+        }
+    }
+}
+
+/// Small indirection so ModelStore stays importable without AppKit.
 enum NSWorkspaceProxy {
     @MainActor
     static func reveal(_ url: URL) {

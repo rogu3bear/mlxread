@@ -5,11 +5,15 @@ enum Constants {
     static let bundleIdentifier = Bundle.main.bundleIdentifier ?? "me.jkca.mlxread"
     static let logSubsystem = "me.jkca.mlxread"
 
+    static var applicationSupportDirectory: URL {
+        let base = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
+        return base.appendingPathComponent("MLXRead", isDirectory: true)
+    }
+
     /// Root directory for model assets:
     /// ~/Library/Application Support/MLXRead/Models
     static var modelsDirectory: URL {
-        let base = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
-        return base.appendingPathComponent("MLXRead/Models", isDirectory: true)
+        applicationSupportDirectory.appendingPathComponent("Models", isDirectory: true)
     }
 
     enum DefaultsKey {

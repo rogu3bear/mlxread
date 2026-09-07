@@ -4,208 +4,196 @@ struct VoiceSettingsView: View {
     @Environment(AppSettings.self) private var settings
     @Environment(ModelStore.self) private var modelStore
     @Environment(SpeechCoordinator.self) private var coordinator
-    @State private var sampleText = VoiceOption(id: "af_heart").sampleText
+    @State private var sampleText = VoiceOption.sampleText(language: "en-US")
+    @State private var search = ""
+    @State private var englishOnly = true
     @State private var hasPreparedSample = false
 
-    private var voice: VoiceOption {
-        VoiceOption(id: settings.speechConfiguration.voice ?? "af_heart")
-    }
+    private var model: ModelInfo { settings.selectedModel }
+    private var language: String { settings.speechConfiguration.language ?? "en-US" }
+    private var samplePassage: String { VoiceOption.sampleText(language: language) }
+    private var sampleIsEmpty: Bool { sampleText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
 
     private var voices: [VoiceOption] {
-        guard modelStore.state(for: settings.selectedModel) == .downloaded else { return [] }
-        return modelStore.availableVoices(for: settings.selectedModel)
-            .map { VoiceOption(id: $0) }
-            .sorted { $0.name.localizedStandardCompare($1.name) == .orderedAscending }
+        guard modelStore.state(for: model) == .downloaded else { return [] }
+        if !model.supportsVoices {
+            return [VoiceOption(id: "default", displayName: "Default English voice", fixedLanguage: "en-US")]
+        }
+        return modelStore.availableVoices(for: model).map { model.voiceOption($0) }.sorted {
+            let leftEnglish = $0.languageCode.hasPrefix("en")
+            let rightEnglish = $1.languageCode.hasPrefix("en")
+            if leftEnglish != rightEnglish { return leftEnglish }
+            return $0.name.localizedStandardCompare($1.name) == .orderedAscending
+        }
     }
 
-    private var voiceOptions: [VoiceOption] {
-        voices.contains(where: { $0.id == voice.id }) ? voices : voices + [voice]
+    private var visibleVoices: [VoiceOption] {
+        voices.filter { voice in
+            (!englishOnly || model.supportsIndependentLanguage || voice.languageCode.hasPrefix("en")) &&
+                (search.isEmpty || voice.menuLabel.localizedStandardContains(search))
+        }
     }
 
-    private var modelAvailability: SpeechState? {
-        modelStore.availability(for: settings.selectedModel, voice: settings.speechConfiguration.voice)
+    private var availability: SpeechState? {
+        modelStore.availability(for: model, voice: settings.speechConfiguration.voice, language: language)
     }
 
     var body: some View {
         @Bindable var settings = settings
         Form {
-            Section("Voice") {
-                Picker("Speech model", selection: Binding(
+            Section("Reading voice") {
+                Picker("Speech engine", selection: Binding(
                     get: { settings.selectedModelID },
                     set: { if let model = ModelManifest.model(withID: $0) { settings.selectModel(model) } }
                 )) {
-                    ForEach(ModelManifest.all) { model in
-                        Text(model.displayName).tag(model.id)
-                    }
+                    ForEach(ModelManifest.all) { Text($0.displayName).tag($0.id) }
                 }
-                Text(settings.selectedModel.summary)
-                    .foregroundStyle(.secondary)
-
-                if settings.selectedModel.supportsVoices,
-                   modelStore.state(for: settings.selectedModel) == .downloaded {
-                    Picker("Language", selection: Binding(
-                        get: { voice.languageCode },
-                        set: { language in
-                            if let first = voices.first(where: { $0.languageCode == language }) {
-                                settings.selectedVoice = first.id
-                            }
-                        }
-                    )) {
-                        ForEach(languageOptions) { option in
-                            Text(option.languageName).tag(option.languageCode)
-                                .disabled(!voices.contains(where: { $0.languageCode == option.languageCode }))
-                        }
+                .disabled(coordinator.state.isBusy)
+                Text(model.summary).fixedSize(horizontal: false, vertical: true)
+                if model.supportsIndependentLanguage {
+                    Picker("Reading language", selection: $settings.selectedLanguage) {
+                        ForEach(model.languages, id: \.self) { Text(VoiceOption.languageName($0)).tag($0) }
                     }
-                    .help("Choose the language of the text you’ll be reading")
-                    Picker("Voice", selection: Binding(
-                        get: { voice.id }, set: { settings.selectedVoice = $0 }
-                    )) {
-                        ForEach(voiceOptions.filter { $0.languageCode == voice.languageCode }) { option in
-                            let available = voices.contains(where: { $0.id == option.id })
-                            Text(available ? option.name : "\(option.name) (unavailable)")
-                                .tag(option.id).disabled(!available)
-                        }
+                    .disabled(coordinator.state.isBusy)
+                    Picker("Delivery", selection: $settings.speechDelivery) {
+                        ForEach(SpeechDelivery.allCases, id: \.self) { Text($0.rawValue).tag($0) }
                     }
-                    if modelAvailability == .voiceRequired {
-                        Text(voices.isEmpty
-                             ? "No usable voice files were found. Open Models to move this download to Trash, then download it again."
-                             : "Your saved voice is unavailable in these model files. Choose an available voice or language above.")
-                            .foregroundStyle(.secondary)
-                            .fixedSize(horizontal: false, vertical: true)
-                    }
-                } else if !settings.selectedModel.supportsVoices {
-                    LabeledContent("Language", value: "English")
-                    Text("Soprano has one voice. Choose Kokoro for more voices and languages.")
-                        .foregroundStyle(.secondary)
+                    Text("Choose the language of your text and a speaking style.")
+                        .foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+                } else {
+                    LabeledContent("Reading language", value: VoiceOption.languageName(language))
+                }
+                LabeledContent("Selected voice", value: model.supportsVoices ? model.voiceOption(settings.selectedVoice).name : "Default English voice")
+                if availability == .voiceRequired {
+                    Label("Choose an available voice that supports the reading language below.", systemImage: "exclamationmark.triangle")
+                        .fixedSize(horizontal: false, vertical: true)
                 }
                 downloadStatus
             }
-            .disabled(coordinator.state.isBusy)
 
-            Section("Reading speed") {
-                VStack(alignment: .leading, spacing: 12) {
-                    HStack(spacing: 12) {
-                        Slider(value: $settings.speechSpeed, in: 0.5...2.0, step: 0.05) {
-                            Text("Reading speed")
-                        } minimumValueLabel: {
-                            Text("0.5×").font(.body)
-                        } maximumValueLabel: {
-                            Text("2×").font(.body)
-                        }
-                        .labelsHidden()
-                        .accessibilityValue(String(format: "%g times normal speed", settings.speechSpeed))
-                        Text(String(format: "%g×", settings.speechSpeed))
-                            .monospacedDigit().frame(width: 48, alignment: .trailing)
-                    }
+            Section(model.supportsVoices ? "Compare voices" : "Preview") {
+                DisclosureGroup("Preview passage and speed") {
+                    TextEditor(text: $sampleText)
+                        .font(.body).lineSpacing(3).frame(height: 64)
+                        .accessibilityLabel("Voice preview text")
+                        .disabled(coordinator.state.isBusy)
+                    Button("Use sample text") { sampleText = samplePassage }
+                        .disabled(coordinator.state.isBusy)
                     HStack {
-                        Button("Slower · 0.8×") { settings.speechSpeed = 0.8 }
-                        Button("Normal · 1×") { settings.speechSpeed = 1.0 }
-                        Button("Faster · 1.25×") { settings.speechSpeed = 1.25 }
+                        Slider(value: $settings.speechSpeed, in: 0.5...2, step: 0.05) { Text("Reading speed") }
+                            .accessibilityValue(String(format: "%g times normal speed", settings.speechSpeed))
+                            .help("0.5× to 2× normal speed")
+                        Text(String(format: "%g×", settings.speechSpeed)).monospacedDigit().frame(width: 40)
+                        Button("Reset speed") { settings.speechSpeed = 1 }
                     }
-                    Text(coordinator.state.isBusy
-                         ? "Speed changes apply to your next reading."
-                         : "Preview again to hear the new pace.")
-                        .foregroundStyle(.secondary)
                 }
+                if coordinator.state.isBusy {
+                    HStack {
+                        Text(coordinator.state.displayName)
+                        Spacer()
+                        Button("Stop preview") { coordinator.stop() }
+                    }
+                } else if case .failed(let error) = coordinator.state {
+                    Label(error.errorDescription ?? "Couldn’t play the preview. Try again.", systemImage: "exclamationmark.triangle")
+                        .fixedSize(horizontal: false, vertical: true)
+                } else if sampleIsEmpty {
+                    Text("Enter a passage or use the sample text to compare voices.")
+                }
+                Text(model.supportsVoices
+                     ? "Preview stays on this Mac and does not change your selected voice. Choose Use to keep a voice for reading."
+                     : "Listen to the sample passage or try your own text. Previews stay on this Mac.")
+                    .foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
             }
 
-            Section("Listen and compare") {
-                VStack(alignment: .leading, spacing: 12) {
-                TextEditor(text: $sampleText)
-                    .font(.system(size: 14))
-                    .lineSpacing(4)
-                    .frame(height: 88)
-                    .accessibilityLabel("Voice preview text")
-                    .disabled(coordinator.state.isBusy)
-
-                HStack(spacing: 16) {
-                    Button {
-                        if coordinator.state.isBusy {
-                            coordinator.stop()
-                        } else {
-                            coordinator.speakSample(sampleText)
+            if !voices.isEmpty {
+                Section(voices.count == 1 ? "Voice preview" : "Voice previews · \(voices.count) available") {
+                    if voices.count > 1 {
+                        TextField("Find a voice", text: $search)
+                        if !model.supportsIndependentLanguage && model.languages.count > 1 {
+                            Picker("Show", selection: $englishOnly) {
+                                Text("English voices").tag(true)
+                                Text("All languages").tag(false)
+                            }.pickerStyle(.segmented)
                         }
-                    } label: {
-                        Label(coordinator.state.isBusy ? "Stop" : "Preview Voice",
-                              systemImage: coordinator.state.isBusy ? "stop.fill" : "play.fill")
                     }
-                    .buttonStyle(.borderedProminent)
-                    .disabled(!coordinator.state.isBusy &&
-                              (modelAvailability != nil ||
-                               sampleText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty))
-                    Button("Use sample text") { sampleText = voice.sampleText }
-                        .disabled(coordinator.state.isBusy)
-                    Spacer()
-                }
-
-                previewStatus
-                Text("Preview text stays on this Mac and is not saved. The first preview in a language may download pronunciation files.")
-                    .foregroundStyle(.secondary)
+                    ForEach(visibleVoices) { voice in voiceRow(voice) }
+                    if visibleVoices.isEmpty { Text("No matching voices. Clear the search or show all languages.") }
                 }
             }
         }
         .formStyle(.grouped)
         .onAppear {
-            if !hasPreparedSample {
-                sampleText = voice.sampleText
-                hasPreparedSample = true
-            }
+            if !hasPreparedSample { sampleText = samplePassage; hasPreparedSample = true }
         }
         .onChange(of: settings.selectedModelID) { _, _ in
+            search = ""
             coordinator.refreshAvailability(clearFailure: true)
         }
-        .onChange(of: voice.languageCode) { _, _ in sampleText = voice.sampleText }
-        .onChange(of: settings.selectedVoice) { _, _ in
+        .onChange(of: language) { _, _ in
+            sampleText = samplePassage
             coordinator.refreshAvailability(clearFailure: true)
         }
+        .onChange(of: settings.selectedVoice) { _, _ in coordinator.refreshAvailability(clearFailure: true) }
     }
 
-    private var languageOptions: [VoiceOption] {
-        var seen = Set<String>()
-        return voiceOptions.filter { seen.insert($0.languageCode).inserted }
-            .sorted { $0.languageName.localizedStandardCompare($1.languageName) == .orderedAscending }
+    private func voiceRow(_ voice: VoiceOption) -> some View {
+        let usable = model.canRead(voice: voice.id, language: language)
+        let previewLanguage = model.supportsIndependentLanguage && usable ? language : voice.languageCode
+        let selected = !model.supportsVoices || voice.id == settings.selectedVoice
+        let active = coordinator.state.isBusy && (coordinator.activeConfiguration?.voice ?? "default") == voice.id
+        return HStack(spacing: 12) {
+            VStack(alignment: .leading, spacing: 4) {
+                Text(voice.name).fontWeight(.medium)
+                Text(voice.languageName + (model.supportsIndependentLanguage ? " native voice" : ""))
+                    .foregroundStyle(.secondary)
+                if !usable {
+                    Text("Chinese dialect only in this engine. Preview uses Chinese.")
+                        .foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+                }
+            }
+            Spacer(minLength: 8)
+            Button(active ? "Stop" : "Preview") {
+                if active { coordinator.stop() }
+                else {
+                    let configuration = SpeechConfiguration(
+                        voice: model.supportsVoices ? voice.id : nil, speed: settings.speechSpeed,
+                        language: previewLanguage, delivery: settings.speechDelivery
+                    )
+                    let passage = previewLanguage == language ? sampleText : VoiceOption.sampleText(language: previewLanguage)
+                    coordinator.speakSample(passage, configuration: configuration)
+                }
+            }
+            .disabled(sampleIsEmpty || (coordinator.state.isBusy && !active))
+            .accessibilityLabel("\(active ? "Stop" : "Preview") \(voice.name) in \(VoiceOption.languageName(previewLanguage))")
+            .accessibilityIdentifier("preview-\(voice.id)")
+            if selected { Text("Selected").frame(width: 66) }
+            else {
+                Button("Use") { settings.selectedVoice = voice.id }
+                    .disabled(coordinator.state.isBusy || !usable)
+                    .accessibilityLabel("Use \(voice.name) for reading")
+                    .frame(width: 66)
+            }
+        }
+        .padding(.vertical, 5)
     }
 
     @ViewBuilder
     private var downloadStatus: some View {
-        let model = settings.selectedModel
         switch modelStore.state(for: model) {
         case .notDownloaded:
-            Text("Download this model to hear its voices on your Mac.")
-            Button("Download \(model.displayName) · about \(model.approximateSizeMB) MB") {
-                modelStore.download(model)
-            }
+            Button("Download voices · \(model.downloadSize)") { modelStore.download(model) }
         case .downloading(let fraction):
-            ProgressView(value: max(0, min(1, fraction))) {
-                Text("Downloading · \(Int(max(0, min(1, fraction)) * 100))%")
-            }
+            ProgressView(value: fraction) { Text("Downloading · \(Int(fraction * 100))%") }
             Button("Cancel Download") { modelStore.cancelDownload(model) }
-        case .failed(let message):
-            Text("The model couldn’t be downloaded. Check your connection and try again.")
-            DisclosureGroup("Download details") { Text(message).textSelection(.enabled) }
-            Button("Retry Download") { modelStore.download(model) }
-        case .downloaded:
-            EmptyView()
-        }
-    }
-
-    @ViewBuilder
-    private var previewStatus: some View {
-        if coordinator.state.isBusy {
-            HStack(spacing: 8) {
-                if coordinator.state != .playing {
-                    ProgressView().controlSize(.small)
-                }
-                Text(coordinator.state.displayName)
+        case .checking, .cancelling, .deleting:
+            ProgressView(modelStore.state(for: model).label)
+        case .incomplete, .failed:
+            Text("The model download is incomplete. Retry here or delete it in Models.")
+            if case .failed(let message) = modelStore.state(for: model) {
+                DisclosureGroup("Download details") { Text(message).textSelection(.enabled) }
             }
-        } else if case .failed(let error) = coordinator.state {
-            Label(error.errorDescription ?? "Couldn’t play the preview. Try again.",
-                  systemImage: "exclamationmark.triangle")
-                .fixedSize(horizontal: false, vertical: true)
-        } else if sampleText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-            Text("Enter a passage or use the sample text to preview this voice.")
-        } else if modelAvailability == nil {
-            Text("Ready to preview. Use Option–Escape to read text selected in another app.")
+            Button("Retry Download") { modelStore.download(model) }
+        case .downloaded: EmptyView()
         }
     }
 }

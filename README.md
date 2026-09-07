@@ -10,7 +10,8 @@ stops instantly.
 - Menu-bar utility (no Dock icon), SwiftUI + AppKit at the edges; optional
   **launch at login** keeps it always on, a keystroke away
 - Local synthesis via [mlx-audio-swift](https://github.com/Blaizzy/mlx-audio-swift)
-  — Kokoro 82M (default, 54 voices) or Soprano 80M (fast, English)
+  — Chatterbox Turbo (English), Kokoro 82M (default), Qwen3-TTS 1.7B
+  (delivery control), Pocket TTS, and Soprano 80M
 - Selection capture via the Accessibility API, with a clipboard-preserving
   ⌘C fallback for apps that don't expose their selection
 - No network after model download, no telemetry, no logging of your text
@@ -19,7 +20,8 @@ stops instantly.
 
 - Apple Silicon Mac
 - macOS 14 or newer (built and verified on macOS 26.5 / Xcode 26.6)
-- ~0.6 GB disk for both models (either alone is enough)
+- Disk space for the models you choose: Kokoro ~360 MB, Qwen ~3.1 GB,
+  Pocket ~240 MB, Soprano ~200 MB, Chatterbox ~3.5 GB including its codec. One model is enough.
 
 ## Build
 
@@ -45,18 +47,31 @@ Metal kernels need the Xcode build system.
    window.
 2. Grant **Accessibility** access (System Settings → Privacy & Security →
    Accessibility). This powers both selection reading and the ⌥⎋ event tap.
-   The app monitors trust continuously: it picks up the grant without a
-   relaunch, and if you later **revoke** access it removes its keyboard tap and
-   stops any active reading immediately. Settings → Permissions shows both the
-   permission state and whether the ⌥⎋ shortcut is actually installed.
+   The app checks access and shortcut health every second and when it regains
+   focus. It picks up grants and retries transient shortcut failures
+   automatically. Revoking access removes the keyboard tap and stops active
+   reading on the next check. Settings → Permissions shows both access and
+   shortcut readiness.
+   The setup window closes when access is granted.
 3. If Apple's built-in **Speak selection** shortcut is enabled and set to
    ⌥⎋, disable or reassign it under System Settings → Accessibility →
    Spoken Content. MLXRead will not change that setting for you.
-4. Open Settings → **Models** and download a model (Kokoro ~360 MB or
-   Soprano ~200 MB, from Hugging Face into
+4. Open Settings → **Models** and choose **Download** for a model (from Hugging Face into
    `~/Library/Application Support/MLXRead/Models`). Kokoro fetches small
    pronunciation assets on its first synthesis; after that everything is
    offline.
+
+Models shows download progress, incomplete/failed downloads, deletion in
+progress, and **Ready to preview** after required files are checked. **Preview**
+selects the model and reads a sample; **Use Model** selects it without playing.
+**Delete** removes that model's files and any legacy copy in the app's cache.
+You can download it again later; its saved voice choice is retained. An active
+reading must finish or stop before deleting the selected model. **Refresh Status**
+rechecks files if you changed the models folder outside the app.
+Only one MLXRead instance can run at a time. Opening it again reuses the running
+app; reopening it while its windows are closed brings up Settings. Direct
+executable launches also exit before starting duplicate services. Quit the
+running app before switching between an installed and development build.
 
 ## Use
 
@@ -65,14 +80,29 @@ Metal kernels need the Xcode build system.
 | ⌥⎋ with text selected | Selection is captured, synthesized sentence-by-sentence, playback starts as soon as the first chunk is ready |
 | ⌥⎋ while reading | Generation cancelled, playback stopped, queue cleared — immediately |
 | Menu bar → Read Selection / Stop | Same as the shortcut |
-| Settings → Voice | Voices by name and language, speed (0.5–2×), editable local preview |
+| Settings → Voice | Searchable voice previews, explicit reading language, speed (0.5–2×), editable local passage |
 
-Voice settings opens first. Choose a model, a language and voice (Kokoro), then
-use **Preview Voice** to compare the same passage. The sample changes with the
-language, and preview text is never saved. Downloading a missing model is an
-explicit action; a preview does not need Accessibility access. Kokoro adjusts
-speech timing during synthesis; Soprano uses pitch-preserving playback speed.
-Voice and speed changes apply to the next reading.
+The menu bar icon shows a rotating progress ring while loading a voice or
+preparing speech, then a filled waveform while speaking. With Reduce Motion
+enabled, the progress ring stays still.
+
+Voice settings opens first. Pick an engine and compare its voices using the
+individual **Preview** buttons. Previews do not change the saved reading voice;
+**Use** selects it. English voices appear first. Kokoro's **All languages** filter
+exposes every installed voice, with a sample in that voice's language. The preview
+passage stays in memory and is never saved or taken from another app's selection.
+
+Qwen receives an explicit reading language, defaulting to English, and supports
+**Natural**, **Narration**, and **Expressive** delivery instructions. These guide
+the sound and are never prepended to the passage. Ryan and Aiden are its native
+English voices. Dylan and Eric force a Chinese dialect in the pinned runtime, so
+they can be previewed in Chinese but cannot be selected for English reading.
+The other presets support cross-language speech, with their native-language
+accents labeled. Chatterbox Turbo, Pocket, and Soprano are English-only.
+
+Kokoro adjusts speech timing during synthesis; the other models use
+pitch-preserving playback speed. Each reading snapshots its voice, language,
+delivery, and speed. Only the most recently used model stays loaded in memory.
 
 Long selections are truncated at a configurable limit (default 20,000
 characters) at a word boundary; truncation is indicated in the menu.
@@ -152,9 +182,10 @@ Details in [website/README.md](website/README.md).
 
 ## Troubleshooting
 
-- **⌥⎋ does nothing** — check Settings → Permissions; the event tap needs
-  Accessibility access. After granting, use "Recheck". If another app also
-  taps ⌥⎋ (e.g. Apple Speak Selection), resolve the conflict.
+- **⌥⎋ does nothing** — check Settings → Permissions. Grant missing
+  Accessibility access; the shortcut starts automatically. If three automatic
+  attempts fail, use **Retry Shortcut**. If another app also taps ⌥⎋
+  (e.g. Apple Speak Selection), resolve the conflict.
 - **"No selected text was found"** — the frontmost app reported no
   selection. For apps without Accessibility text (some Electron apps,
   protected fields), enable the clipboard fallback in Settings → General.
@@ -169,9 +200,11 @@ Details in [website/README.md](website/README.md).
 
 ## Known limitations
 
-- Kokoro/Soprano generate per sentence-chunk, not sample-streaming: time to
+- Kokoro/Soprano/Pocket/Chatterbox generate per sentence-chunk, not sample-streaming: time to
   first audio is one chunk's synthesis (~1–2 s warm for Kokoro on M-series;
   see docs/testing.md for measured values).
+- Qwen streams within each sentence chunk. Its larger download and model load
+  trade speed and memory for a different voice model; compare previews on your Mac.
 - Kokoro cancellation takes effect at forward-pass boundaries (≤ one chunk);
   audible playback still stops instantly.
 - Soprano ignores voice selection (single-voice model) and is English-only.

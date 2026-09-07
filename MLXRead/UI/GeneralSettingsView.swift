@@ -13,8 +13,8 @@ struct GeneralSettingsView: View {
                 LabeledContent("Keyboard shortcut") {
                     Text("⌥ Esc · Option–Escape").font(.body.weight(.medium))
                 }
-                Label(appState.hotkeyInstalled ? "Shortcut ready" : "Shortcut needs setup",
-                      systemImage: appState.hotkeyInstalled ? "checkmark.circle" : "exclamationmark.triangle")
+                Label(appState.selectionAccess.shortcutActive ? "Shortcut ready" : "Shortcut unavailable",
+                      systemImage: appState.selectionAccess.shortcutActive ? "checkmark.circle" : "exclamationmark.triangle")
                 Text("Select text in another app, then press Option–Escape to start reading. Press it again to stop.")
                 Text("If macOS Speak Selection uses the same shortcut, change it in System Settings → Accessibility → Spoken Content.")
                     .foregroundStyle(.secondary)

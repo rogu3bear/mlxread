@@ -18,24 +18,25 @@ resolved at project creation and are locked in
 
 ## Model decision
 
-The instruction was: use native Kokoro if present and functional, else
-Soprano. Inspection of mlx-audio-swift v0.1.3 found a **complete native
-Kokoro implementation** (`Sources/MLXAudioTTS/Models/StyleTTS2/Kokoro/`,
-routed through `TTS.loadModel` with model types `kokoro`/`kokoro_tts`), so
-MLXRead ships both:
+MLXRead keeps Kokoro as the default and offers four optional alternatives.
+All five have native implementations in the pinned mlx-audio-swift v0.1.3;
+adding them does not require a Python process or a remote speech service.
 
 | Model | Repo | Revision at verification | Weights license | Role |
 |---|---|---|---|---|
 | Kokoro 82M | `mlx-community/Kokoro-82M-bf16` | `a71e4d38b236` (main) | Apache-2.0 | Default; 54 voices, multilingual |
 | Soprano 80M | `mlx-community/Soprano-80M-bf16` | `b7da048eff3d` (main) | Apache-2.0 | Low-latency English alternative |
+| Qwen3-TTS 1.7B CustomVoice, 8-bit | `mlx-community/Qwen3-TTS-12Hz-1.7B-CustomVoice-8bit` | main | Apache-2.0 | Nine presets; delivery instructions; explicit language with dialect restrictions |
+| Chatterbox Turbo fp16 | `mlx-community/chatterbox-turbo-fp16` + `mlx-community/S3TokenizerV2` | main | Apache-2.0 (MLX card), MIT (original model); codec Apache-2.0 upstream | English engine with one built-in voice |
+| Pocket TTS | `mlx-community/pocket-tts` | main | CC-BY-4.0 | Eight English voices; small download |
 
 Measured disk usage after download is shown live in Settings → Models
 (approximate manifest sizes: Kokoro ~360 MB including voices, Soprano
-~200 MB).
+~200 MB, Qwen ~3.1 GB including its speech tokenizer, Pocket ~240 MB, Chatterbox ~3.5 GB including its codec).
 
 Facts that shaped the engine design (verified by reading the v0.1.3 source):
 
-- **Neither Kokoro nor Soprano produces incremental audio.** Both implement
+- **Kokoro, Soprano, Pocket, and Chatterbox produce one audio buffer per call.** They implement
   `generateStream` as a single final `.audio` event
   (`KokoroModel.swift:182-210`; Soprano decodes audio once after token
   generation, `Soprano.swift:693-798`). The `streamingInterval:` overload is
@@ -44,6 +45,8 @@ Facts that shaped the engine design (verified by reading the v0.1.3 source):
   chunking** (`TextChunker`): chunks are synthesized sequentially and each
   chunk's audio is scheduled as soon as it exists. This is the mechanism
   behind "playback starts before the full selection is synthesized".
+  Qwen also streams audio within each sentence chunk; the app requests a
+  0.5-second streaming interval. This is not a promise about first-audio latency.
 - **Cancellation:** Soprano checks `Task.isCancelled` per generated token
   (`Soprano.swift:837`); Kokoro only checks around its single forward pass
   (`KokoroModel.swift:176-179`). MLXRead additionally checks cancellation
@@ -53,9 +56,36 @@ Facts that shaped the engine design (verified by reading the v0.1.3 source):
   are enumerated from disk. Soprano ignores the `voice` argument entirely
   (model README + `Soprano.swift:283-297`), so MLXRead exposes no voice
   control for it.
-- **Speed:** neither Swift model API exposes a synthesis-rate parameter, so
-  speed is implemented uniformly with `AVAudioUnitTimePitch` (pitch-preserving
-  rate control) in the playback graph.
+  Pocket discovers `embeddings/<name>.safetensors`; Qwen's presets are embedded
+  in the checkpoint rather than separate voice files. Required tokenizer files
+  belong to each model's manifest entry, not a shared Kokoro-only check.
+- **Speed:** Kokoro adjusts phoneme durations during synthesis. The other
+  models use `AVAudioUnitTimePitch` (pitch-preserving rate control).
+
+### Language and delivery
+
+Qwen's CustomVoice API accepts separate text, language, speaker, and optional
+instructions ([upstream guide](https://huggingface.co/Qwen/Qwen3-TTS-12Hz-1.7B-CustomVoice)).
+The pinned Swift adapter carries speaker and instruction in its `voice` argument
+as `speaker, instruction`. MLXRead uses this supported format for three delivery
+presets and maps the explicit reading language to Qwen's language names. It does
+not insert a chat system prompt into text-to-speech input.
+
+The pinned `prepareGenerationInputs` unconditionally replaces the language ID
+for Dylan and Eric with the speaker's Chinese dialect. The downloaded config
+maps them to Beijing/Sichuan dialects. MLXRead therefore advertises and validates
+Chinese-only use for those two voices. They remain previewable with a Chinese
+sample. Other Qwen voices retain independent language choice; native English
+voices appear first and every voice's native language is visible.
+
+[Chatterbox Turbo](https://github.com/resemble-ai/chatterbox) supplies a distinct
+English-only architecture and default voice. Its local Swift loader also opens
+S3TokenizerV2. Download prefetches both assets, validates them, and includes both
+in storage and deletion; preparation gates incomplete assets before invoking the
+loader. This pass uses the unquantized checkpoint named `chatterbox-turbo-fp16`
+to avoid adding quantization as a quality variable; its published tensor metadata
+reports F32 weights.
+A better voice preference must still be established by listening.
 
 ## Model cache and the HF_HUB_CACHE bootstrap
 
@@ -77,9 +107,21 @@ even after the main model download; Settings → Models' Download button
 performs only the weight snapshot. The G2P assets are then cached forever.
 (A fully offline-after-download guarantee is verified in docs/testing.md.)
 
-Download progress uses
-`ModelUtils.resolveOrDownloadModel(client:cache:repoID:...:progressHandler:)`,
-the only variant that surfaces `Progress`.
+Downloads use `HubClient.downloadSnapshot` directly with byte-weighted progress
+and a destination inside the app's models directory. The pinned Hub client
+requires a cache even when given a destination, so completed downloads discard
+that extra cache after its resolved files have been copied. Any retained cache
+is included in disk usage and deleted with the model. This bypasses `ModelUtils`' cache shortcut,
+which treats config plus any nonempty weights file as complete and can skip
+missing tokenizer or voice assets. ModelStore checks each model's required files
+after download and on refresh. The engine loads that local directory, so a
+preview cannot silently redownload deleted weights.
+
+Delete marks the model unavailable, cancels and joins an active download, then
+removes both the model folder and any legacy Hub cache for that model. Operation
+identities reject progress from earlier downloads. The engine cache releases
+unavailable models and keeps only the last used engine warm. Preferences retain
+each model's voice and Qwen's reading language across deletion and re-download.
 
 ## Project generation
 
@@ -95,7 +137,7 @@ non-interactive `xcodebuild` because mlx-swift ships a build plugin
 ## Concurrency model
 
 - UI state: `@MainActor` `@Observable` (`SpeechCoordinator`, `AppSettings`,
-  `ModelStore`, `AccessibilityPermissionService`).
+  `ModelStore`, `SelectionAccessService`).
 - Model load + generation: `NativeMLXSpeechEngine` actor; single-flight
   prepare task; generation task cancelled via `cancel()` or stream
   termination.
