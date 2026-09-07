@@ -108,6 +108,7 @@ final class SpeechCoordinator {
             task?.cancel()
             await player.stopImmediately()
             await engine?.cancel()
+            await task?.value
             await MainActor.run {
                 if self.state == .stopping {
                     self.state = .idle

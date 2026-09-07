@@ -23,7 +23,8 @@ struct MenuBarContent: View {
             }
             .keyboardShortcut("r")
             .disabled(coordinator.state.isBusy || !permissions.isTrusted ||
-                      modelStore.state(for: settings.selectedModel) != .downloaded)
+                      modelStore.availability(for: settings.selectedModel, voice: settings.speechConfiguration.voice,
+                                              language: settings.speechConfiguration.language) != nil)
 
             Button("Stop") {
                 coordinator.stop()
@@ -46,11 +47,14 @@ struct MenuBarContent: View {
                 if !voices.isEmpty {
                     Picker("Voice", selection: voiceBinding) {
                         if let selectedVoice = settings.speechConfiguration.voice, !voices.contains(selectedVoice) {
-                            Text("\(VoiceOption(id: selectedVoice).name) (unavailable)")
+                            Text("\(settings.selectedModel.voiceOption(selectedVoice).name) (unavailable)")
                                 .tag(selectedVoice).disabled(true)
                         }
                         ForEach(voices, id: \.self) { voice in
-                            Text(String(VoiceOption(id: voice).menuLabel.prefix(30))).tag(voice)
+                            let model = settings.selectedModel
+                            Text(model.voiceOption(voice).menuLabel).tag(voice)
+                                .disabled(!model.canRead(voice: voice, language: model.readingLanguage(
+                                    voice: voice, requested: settings.selectedLanguage)))
                         }
                     }
                     .disabled(coordinator.state.isBusy)

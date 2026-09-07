@@ -224,6 +224,29 @@ final class IntegrationTests: XCTestCase {
         print("MODEL_VERIFIED|pocket|chunks=\(chunks.count)|elapsed=\(ContinuousClock.now - start)")
     }
 
+    func testQwenAndPocketCancellationThenReplay() async throws {
+        for model in [ModelManifest.qwen, ModelManifest.pocket] {
+            let engine = try await downloadedEngine(model)
+            try await engine.prepare()
+            let configuration = SpeechConfiguration(voice: model.defaultVoice, language: "en-US")
+            let consumer = Task {
+                try? await self.collectChunks(engine: engine,
+                    text: "This preview is interrupted while its decoder is still working. A later sentence must not run.",
+                    configuration: configuration)
+            }
+            try await Task.sleep(for: .milliseconds(300))
+            consumer.cancel()
+            let stop = ContinuousClock.now
+            await engine.cancel()
+            _ = await consumer.value
+            let chunks = try await collectChunks(engine: engine, text: "The next preview is ready.",
+                                                  configuration: configuration)
+            assertValidAudio(chunks, expectedRate: model.nominalSampleRate)
+            print("MODEL_REPLAY_VERIFIED|\(model.id)|stop_and_replay=\(ContinuousClock.now - stop)")
+            await engine.unload()
+        }
+    }
+
     func testDownloadDeleteAndRedownloadInIsolatedLibrary() async throws {
         // Real transport and files, without deleting the user's installed models.
         let root = FileManager.default.temporaryDirectory.appendingPathComponent("mlxread-model-cycle-\(UUID().uuidString)")

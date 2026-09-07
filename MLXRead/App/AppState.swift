@@ -100,7 +100,15 @@ final class EngineCache {
 
     func releaseUnavailableModels(in store: ModelStore) {
         guard let engine, let info = ModelManifest.model(withID: engine.identifier) else { return }
+        guard !store.state(for: info).isBusy else { return }
         if store.state(for: info) != .downloaded { self.engine = nil }
+    }
+
+    func prepareForRemoval(_ model: ModelInfo) async {
+        guard let current = engine, current.identifier == model.id else { return }
+        await current.cancel()
+        if let native = current as? NativeMLXSpeechEngine { await native.unload() }
+        if engine?.identifier == model.id { engine = nil }
     }
 }
 
@@ -185,6 +193,9 @@ final class AppState {
             guard let self else { return }
             self.engineCache.releaseUnavailableModels(in: self.modelStore)
             self.coordinator.refreshAvailability()
+        }
+        modelStore.prepareForRemoval = { [weak self] model in
+            await self?.engineCache.prepareForRemoval(model)
         }
         selectionAccess.onChange = { [weak self] trusted in
             guard let self else { return }

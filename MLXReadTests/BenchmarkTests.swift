@@ -41,6 +41,8 @@ final class BenchmarkTests: XCTestCase {
     }
 
     private func runBenchmark(model: ModelInfo, voice: String?) async throws {
+        let available = await MainActor.run { ModelStore().validate(model) }
+        try XCTSkipUnless(available, "Download \(model.displayName) in MLXRead before benchmarking it.")
         let engine = NativeMLXSpeechEngine(modelInfo: model)
 
         let coldStart = ContinuousClock.now

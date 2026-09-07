@@ -12,6 +12,7 @@ final class ModelStore {
         didSet { onStateChange?() }
     }
     var onStateChange: (() -> Void)?
+    var prepareForRemoval: ((ModelInfo) async -> Void)?
     private var downloadTasks: [String: (id: UUID, task: Task<Void, Never>)] = [:]
     private let downloader: any ModelDownloading
 
@@ -135,6 +136,7 @@ final class ModelStore {
     func remove(_ model: ModelInfo, movingToTrash: Bool = false) async throws {
         guard state(for: model) != .deleting else { return }
         states[model.id] = .deleting
+        await prepareForRemoval?(model)
         // Cancellation is not completion. Join the writer before deleting so
         // it cannot recreate files or publish a stale downloaded state.
         if let task = downloadTasks[model.id] {

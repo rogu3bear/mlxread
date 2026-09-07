@@ -1,4 +1,8 @@
 import XCTest
+@preconcurrency import MLX
+import MLXAudioCore
+import MLXAudioTTS
+import MLXLMCommon
 @testable import MLXRead
 
 final class SingleInstanceLockTests: XCTestCase {
@@ -474,6 +478,24 @@ final class ModelStoreTests: XCTestCase {
         try await store.remove(ModelManifest.pocket)
         XCTAssertNil(cache.engine)
     }
+
+    func testDeletionWaitsForPreparationBeforeRemovingAssets() async throws {
+        let store = ModelStore(rootDirectory: tempRoot)
+        let model = ModelManifest.pocket
+        try plantValidModel(model, in: store)
+        store.refreshAllStates()
+        let gate = ModelWorkGate()
+        store.prepareForRemoval = { _ in await gate.run() }
+        let deletion = Task { try await store.remove(model) }
+        try await waitFor { await gate.starts == 1 }
+        XCTAssertEqual(store.state(for: model), .deleting)
+        XCTAssertEqual(store.availability(for: model, voice: "alba"), .modelRequired)
+        XCTAssertTrue(FileManager.default.fileExists(atPath: store.directory(for: model).path))
+        await gate.release()
+        try await deletion.value
+        XCTAssertEqual(store.state(for: model), .notDownloaded)
+        XCTAssertFalse(FileManager.default.fileExists(atPath: store.directory(for: model).path))
+    }
 }
 
 private func plantCatalogModel(_ model: ModelInfo, directory: URL) throws {
@@ -521,6 +543,66 @@ private func waitFor(_ condition: @escaping () async -> Bool) async throws {
 
 /// Single-flight semantics of engine preparation, using the mock engine.
 final class EnginePreparationTests: XCTestCase {
+    func testMissingLocalModelFailsWithoutCreatingDownloadDirectories() async throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent("missing-local-model-\(UUID())")
+        defer { try? FileManager.default.removeItem(at: root) }
+        for model in ModelManifest.all {
+            let engine = NativeMLXSpeechEngine(modelInfo: model, modelDirectory: root)
+            do {
+                try await engine.prepare()
+                XCTFail("A missing local model must fail before loading")
+            } catch { }
+            XCTAssertFalse(FileManager.default.fileExists(atPath: root.path))
+        }
+    }
+
+    func testCancelJoinsPreparationBeforeReturning() async throws {
+        let loading = ModelWorkGate()
+        let decoder = ControlledSpeechModel()
+        let engine = NativeMLXSpeechEngine(modelInfo: ModelManifest.pocket, loadModel: { _, _ in
+            await loading.run()
+            return decoder
+        })
+        let preparation = Task { try await engine.prepare() }
+        try await waitFor { await loading.starts == 1 }
+        let cancellation = Task { await engine.cancel(); await loading.markCancelled() }
+        try await Task.sleep(for: .milliseconds(50))
+        let finishedEarly = await loading.cancellationFinished
+        XCTAssertFalse(finishedEarly)
+        await loading.release()
+        try await preparation.value
+        await cancellation.value
+        let finished = await loading.cancellationFinished
+        XCTAssertTrue(finished)
+    }
+
+    func testCancelledProducerFinishesBeforeNextGenerationUsesDecoder() async throws {
+        let decoder = ControlledSpeechModel()
+        let engine = NativeMLXSpeechEngine(modelInfo: ModelManifest.pocket, loadModel: { _, _ in decoder })
+        let firstStream = engine.generate(text: "First preview.", configuration: SpeechConfiguration(voice: "alba"))
+        let first = Task { try? await Array(collecting: firstStream) }
+        try await waitFor { await decoder.work.starts == 1 }
+        first.cancel()
+        let cancellation = Task { await engine.cancel(); await decoder.work.markCancelled() }
+        try await Task.sleep(for: .milliseconds(50))
+        let finishedEarly = await decoder.work.cancellationFinished
+        XCTAssertFalse(finishedEarly, "Cancelling a consumer must not imply the decoder has finished")
+        let nextStream = engine.generate(text: "Next preview.", configuration: SpeechConfiguration(voice: "marius"))
+        let next = Task { try await Array(collecting: nextStream) }
+        try await Task.sleep(for: .milliseconds(50))
+        let startsBeforeDrain = await decoder.work.starts
+        XCTAssertEqual(startsBeforeDrain, 1)
+        await decoder.work.release()
+        await cancellation.value
+        try await waitFor { await decoder.work.starts == 2 }
+        await decoder.work.release()
+        let chunks = try await next.value
+        XCTAssertEqual(chunks.count, 1)
+        let maximumActive = await decoder.work.maximumActive
+        XCTAssertEqual(maximumActive, 1)
+        _ = await first.value
+    }
+
     func testConcurrentPreparesDoNotRace() async throws {
         let engine = MockSpeechEngine()
         try await withThrowingTaskGroup(of: Void.self) { group in
@@ -552,5 +634,57 @@ final class EnginePreparationTests: XCTestCase {
         consumer.cancel()
         let received = await consumer.value
         XCTAssertLessThan(received, 5, "cancellation must cut generation short")
+    }
+}
+
+private actor ModelWorkGate {
+    private(set) var starts = 0
+    private(set) var maximumActive = 0
+    private(set) var cancellationFinished = false
+    private var active = 0
+    private var completion: CheckedContinuation<Void, Never>?
+
+    func run() async {
+        starts += 1
+        active += 1
+        maximumActive = max(maximumActive, active)
+        await withCheckedContinuation { completion = $0 }
+        active -= 1
+    }
+    func release() { completion?.resume(); completion = nil }
+    func markCancelled() { cancellationFinished = true }
+}
+
+/// Matches the upstream API: its producer is independent of the stream consumer.
+private final class ControlledSpeechModel: SpeechGenerationModel, @unchecked Sendable {
+    let work = ModelWorkGate()
+    let sampleRate = 24_000
+    var defaultGenerationParameters: GenerateParameters { GenerateParameters() }
+
+    func generate(text: String, voice: String?, refAudio: MLXArray?, refText: String?,
+                  language: String?, generationParameters: GenerateParameters) async throws -> MLXArray {
+        await work.run()
+        return MLXArray([Float(0.1), 0.2])
+    }
+
+    func generateStream(text: String, voice: String?, refAudio: MLXArray?, refText: String?,
+                        language: String?, generationParameters: GenerateParameters) -> AsyncThrowingStream<AudioGeneration, Error> {
+        AsyncThrowingStream { continuation in
+            let task = Task {
+                let audio = try await self.generate(text: text, voice: voice, refAudio: refAudio,
+                                                    refText: refText, language: language,
+                                                    generationParameters: generationParameters)
+                continuation.yield(.audio(audio))
+                continuation.finish()
+            }
+            continuation.onTermination = { _ in task.cancel() }
+        }
+    }
+}
+
+private extension Array where Element: Sendable {
+    init(collecting stream: AsyncThrowingStream<Element, Error>) async throws {
+        self = []
+        for try await element in stream { append(element) }
     }
 }

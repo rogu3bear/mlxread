@@ -139,8 +139,9 @@ non-interactive `xcodebuild` because mlx-swift ships a build plugin
 - UI state: `@MainActor` `@Observable` (`SpeechCoordinator`, `AppSettings`,
   `ModelStore`, `SelectionAccessService`).
 - Model load + generation: `NativeMLXSpeechEngine` actor; single-flight
-  prepare task; generation task cancelled via `cancel()` or stream
-  termination.
+  prepare task. Stop ends playback immediately, then joins preparation and
+  drains the current sentence's producer before reusing or releasing a decoder.
+  Model deletion waits for that work before removing assets.
 - Playback: `StreamingAudioPlayer` actor over one persistent
   `AVAudioEngine`; bounded in-flight buffers via `AudioQueue` (capacity 4);
   epoch counter invalidates stale completion callbacks.

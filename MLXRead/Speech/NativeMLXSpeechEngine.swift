@@ -15,8 +15,8 @@ import MLXLMCommon
 ///
 /// - preparation is single-flight (`prepareTask` reused);
 /// - the loaded model stays warm for subsequent reads;
-/// - `cancel()` cancels the in-flight generation task; Soprano honors
-///   token-level cancellation, Kokoro at forward-pass boundaries;
+/// - cancellation stops delivery immediately and drains the current sentence
+///   before allowing the model's mutable decoder to be reused;
 /// - selected text only ever lives in memory here.
 actor NativeMLXSpeechEngine: SpeechEngine {
     nonisolated let modelInfo: ModelInfo
@@ -27,13 +27,15 @@ actor NativeMLXSpeechEngine: SpeechEngine {
 
     private var model: SpeechGenerationModel?
     private var prepareTask: Task<Void, Error>?
-    private var generationTask: Task<Void, Never>?
-    private var isGenerating = false
+    private var generation: (request: GenerationRequest, task: Task<Void, Never>)?
     private let modelDirectory: URL
+    private let loadModel: @Sendable (ModelInfo, URL) async throws -> SpeechGenerationModel
 
-    init(modelInfo: ModelInfo, modelDirectory: URL? = nil) {
+    init(modelInfo: ModelInfo, modelDirectory: URL? = nil,
+         loadModel: @escaping @Sendable (ModelInfo, URL) async throws -> SpeechGenerationModel = NativeMLXSpeechEngine.loadLocalModel) {
         self.modelInfo = modelInfo
         self.modelDirectory = modelDirectory ?? Constants.modelsDirectory.appendingPathComponent(modelInfo.cacheSubdirectory)
+        self.loadModel = loadModel
     }
 
     // MARK: - SpeechEngine
@@ -46,6 +48,7 @@ actor NativeMLXSpeechEngine: SpeechEngine {
         }
         let info = modelInfo
         let task = Task<Void, Error> {
+            defer { self.prepareTask = nil }
             if !info.additionalDownloads.isEmpty {
                 // Chatterbox's native loader also opens its S3 codec. Require the
                 // complete app-owned download before that loader can run.
@@ -61,7 +64,7 @@ actor NativeMLXSpeechEngine: SpeechEngine {
             Memory.cacheLimit = 256 * 1024 * 1024
             // Downloads belong to ModelStore. Loading a local snapshot must not
             // silently start another weights download after deletion.
-            let loaded = try await TTS.loadModel(modelRepo: self.modelDirectory.path)
+            let loaded = try await self.loadModel(info, self.modelDirectory)
             self.model = loaded
             let elapsed = ContinuousClock.now - start
             AppLogger.speech.info("Model \(info.id) ready in \(elapsed.description) (sampleRate \(loaded.sampleRate))")
@@ -70,7 +73,6 @@ actor NativeMLXSpeechEngine: SpeechEngine {
         do {
             try await task.value
         } catch {
-            prepareTask = nil
             AppLogger.speech.error("Model load failed: \(error.localizedDescription)")
             throw UserFacingSpeechError.modelLoadFailed(error.localizedDescription)
         }
@@ -81,24 +83,29 @@ actor NativeMLXSpeechEngine: SpeechEngine {
         configuration: SpeechConfiguration
     ) -> AsyncThrowingStream<SpeechAudioChunk, Error> {
         AsyncThrowingStream { continuation in
-            let task = Task {
-                await self.runGeneration(text: text, configuration: configuration, continuation: continuation)
+            let request = GenerationRequest()
+            Task {
+                await self.enqueueGeneration(text: text, configuration: configuration,
+                                             request: request, continuation: continuation)
             }
             continuation.onTermination = { _ in
-                task.cancel()
+                request.cancel()
             }
-            Task { await self.storeGenerationTask(task) }
         }
     }
 
     func cancel() async {
-        generationTask?.cancel()
-        generationTask = nil
+        let current = generation
+        current?.request.cancel()
+        await current?.task.value
+        // Preparation may outlive a cancelled caller. Join it before deletion
+        // or a model switch can release its files and loaded state.
+        try? await prepareTask?.value
     }
 
     /// Releases the loaded model (memory pressure). Next read reloads.
     func unload() {
-        guard !isGenerating else { return }
+        guard generation == nil, prepareTask == nil else { return }
         model = nil
         prepareTask = nil
         Memory.clearCache()
@@ -107,23 +114,36 @@ actor NativeMLXSpeechEngine: SpeechEngine {
 
     // MARK: - Internals
 
-    private func storeGenerationTask(_ task: Task<Void, Never>) {
-        generationTask = task
+    private func enqueueGeneration(
+        text: String, configuration: SpeechConfiguration, request: GenerationRequest,
+        continuation: AsyncThrowingStream<SpeechAudioChunk, Error>.Continuation
+    ) async {
+        let previous = generation
+        previous?.request.cancel()
+        let task = Task {
+            await previous?.task.value
+            await self.runGeneration(text: text, configuration: configuration,
+                                     request: request, continuation: continuation)
+        }
+        generation = (request, task)
+        await task.value
+        if generation?.request === request { generation = nil }
     }
 
     private func runGeneration(
         text: String,
         configuration: SpeechConfiguration,
+        request: GenerationRequest,
         continuation: AsyncThrowingStream<SpeechAudioChunk, Error>.Continuation
     ) async {
-        isGenerating = true
-        defer { isGenerating = false; generationTask = nil }
         do {
+            try request.checkCancellation()
             let language = modelInfo.readingLanguage(voice: configuration.voice, requested: configuration.language)
             guard modelInfo.canRead(voice: configuration.voice, language: language) else {
                 throw UserFacingSpeechError.synthesisFailed("This dialect voice cannot read \(VoiceOption.languageName(language)) in the current engine. Choose another voice.")
             }
             try await prepare()
+            try request.checkCancellation()
             guard let model else {
                 throw UserFacingSpeechError.modelLoadFailed("model unavailable after prepare")
             }
@@ -138,7 +158,7 @@ actor NativeMLXSpeechEngine: SpeechEngine {
             let voice = model is Qwen3TTSModel ? configuration.qwenVoicePrompt
                 : modelInfo.supportsVoices ? (configuration.voice ?? modelInfo.defaultVoice) : nil
             for piece in pieces {
-                try Task.checkCancellation()
+                try request.checkCancellation()
                 let stream = model.generateStream(
                     text: piece,
                     voice: voice,
@@ -149,7 +169,10 @@ actor NativeMLXSpeechEngine: SpeechEngine {
                     streamingInterval: 0.5
                 )
                 for try await event in stream {
-                    try Task.checkCancellation()
+                    // Upstream streams own unstructured producer tasks. Cancelling
+                    // their iterator does not join those tasks. Drain to the real
+                    // terminal event so decoder cleanup precedes the next read.
+                    if request.isCancelled { continue }
                     if case .audio(let audio) = event {
                         let samples: [Float] = audio.asArray(Float.self)
                         guard !samples.isEmpty else { continue }
@@ -161,6 +184,7 @@ actor NativeMLXSpeechEngine: SpeechEngine {
                         index += 1
                     }
                 }
+                try request.checkCancellation()
             }
             Memory.clearCache()
             continuation.finish()
@@ -172,6 +196,26 @@ actor NativeMLXSpeechEngine: SpeechEngine {
         } catch {
             AppLogger.speech.error("Synthesis failed: \(error.localizedDescription)")
             continuation.finish(throwing: UserFacingSpeechError.synthesisFailed(error.localizedDescription))
+        }
+    }
+
+    private nonisolated static func loadLocalModel(_ info: ModelInfo, _ directory: URL) async throws -> SpeechGenerationModel {
+        guard FileManager.default.fileExists(atPath: directory.appendingPathComponent("config.json").path) else {
+            throw UserFacingSpeechError.modelFilesIncomplete
+        }
+        switch info.id {
+        case ModelManifest.kokoro.id:
+            return try await KokoroModel.fromModelDirectory(directory, textProcessor: KokoroMultilingualProcessor())
+        case ModelManifest.soprano.id:
+            return try await SopranoModel.fromModelDirectory(directory, repo: info.id)
+        case ModelManifest.qwen.id:
+            return try await Qwen3TTSModel.fromModelDirectory(directory)
+        case ModelManifest.pocket.id:
+            return try await PocketTTSModel.fromModelDirectory(directory)
+        case ModelManifest.chatterbox.id:
+            return try await ChatterboxModel.fromModelDirectory(directory, hfToken: nil)
+        default:
+            throw UserFacingSpeechError.modelFilesIncomplete
         }
     }
 
@@ -188,5 +232,17 @@ actor NativeMLXSpeechEngine: SpeechEngine {
         case "it": return "Italian"
         default: return "English"
         }
+    }
+}
+
+/// Cancellation belongs to the request, not the task draining the model stream.
+private final class GenerationRequest: @unchecked Sendable {
+    private let lock = NSLock()
+    private var cancelled = false
+
+    var isCancelled: Bool { lock.withLock { cancelled } }
+    func cancel() { lock.withLock { cancelled = true } }
+    func checkCancellation() throws {
+        if isCancelled { throw CancellationError() }
     }
 }
