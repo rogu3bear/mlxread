@@ -22,9 +22,7 @@ struct ReportProblemView: View {
         @Bindable var settings = settings
         Form {
             Section {
-                Text("Something not working? Send a report straight to the developer. It never includes your selected or spoken text — only app diagnostics.")
-                    .font(.callout)
-                    .foregroundStyle(.secondary)
+                Text("Send your description and app diagnostics to the developer. MLXRead does not attach the text you’ve been reading.")
             }
 
             Section("Your email (optional)") {
@@ -32,21 +30,22 @@ struct ReportProblemView: View {
                     .textContentType(.emailAddress)
                     .disableAutocorrection(true)
                 Text("So the developer can reply. Leave it blank to report anonymously.")
-                    .font(.caption)
                     .foregroundStyle(.secondary)
             }
 
             Section("What happened?") {
+                Text("Describe the problem and what you expected. Don’t include private reading content.")
+                    .foregroundStyle(.secondary)
                 TextEditor(text: $description)
                     .frame(minHeight: 90)
                     .font(.body)
+                    .accessibilityLabel("Problem description")
             }
 
             Section {
                 DisclosureGroup("What's included", isExpanded: $showDetails) {
                     Text(summary.isEmpty ? "…" : summary)
-                        .font(.caption.monospaced())
-                        .foregroundStyle(.secondary)
+                        .font(.body.monospaced())
                         .textSelection(.enabled)
                         .frame(maxWidth: .infinity, alignment: .leading)
                 }
@@ -56,14 +55,13 @@ struct ReportProblemView: View {
                 switch phase {
                 case .sent:
                     Label("Report sent — thank you.", systemImage: "checkmark.circle.fill")
-                        .foregroundStyle(.green)
                     Button("Send another") {
                         description = ""
                         phase = .idle
                     }
                 case .failed(let message):
                     Label(message, systemImage: "exclamationmark.triangle.fill")
-                        .foregroundStyle(.orange)
+                        .fixedSize(horizontal: false, vertical: true)
                     Button("Try again") { submit() }
                 default:
                     Button(action: submit) {

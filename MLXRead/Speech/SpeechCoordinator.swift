@@ -18,6 +18,7 @@ final class SpeechCoordinator {
     }
     /// True when the last read had to truncate the selection.
     private(set) var lastReadWasTruncated = false
+    private(set) var activeConfiguration: SpeechConfiguration?
 
     private let selection: any SelectionCapturing
     private let player: any AudioPlaying
@@ -26,10 +27,11 @@ final class SpeechCoordinator {
     private let maximumLengthProvider: () -> Int
     /// External availability gates (permission, model present).
     var availabilityCheck: () -> SpeechState? = { nil }
+    var sampleAvailabilityCheck: () -> SpeechState? = { nil }
 
     private var currentGeneration: UUID?
     private var readingTask: Task<Void, Never>?
-    private var failureResetTask: Task<Void, Never>?
+    private var activeEngine: (any SpeechEngine)?
 
     init(
         selection: any SelectionCapturing,
@@ -81,6 +83,11 @@ final class SpeechCoordinator {
     /// Settings "test phrase" playback; skips selection capture.
     func speakSample(_ text: String) {
         guard !state.isBusy else { return }
+        guard !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
+        if let gated = sampleAvailabilityCheck() {
+            state = gated
+            return
+        }
         startReading(source: .fixedText(text))
     }
 
@@ -90,10 +97,13 @@ final class SpeechCoordinator {
         let task = readingTask
         readingTask = nil
         currentGeneration = nil
-        Task { [player, engineProvider] in
+        activeConfiguration = nil
+        let engine = activeEngine
+        activeEngine = nil
+        Task { [player] in
             task?.cancel()
-            await engineProvider().cancel()
             await player.stopImmediately()
+            await engine?.cancel()
             await MainActor.run {
                 if self.state == .stopping {
                     self.state = .idle
@@ -111,11 +121,15 @@ final class SpeechCoordinator {
     }
 
     private func startReading(source: ReadingSource) {
-        failureResetTask?.cancel()
         lastReadWasTruncated = false
         let generation = UUID()
         currentGeneration = generation
-        state = .capturing
+        activeConfiguration = configurationProvider()
+        activeEngine = engineProvider()
+        switch source {
+        case .selectionCapture: state = .capturing
+        case .fixedText: state = .preparing
+        }
 
         readingTask = Task { [weak self] in
             await self?.run(generation: generation, source: source)
@@ -145,13 +159,12 @@ final class SpeechCoordinator {
 
             guard isCurrent(generation) else { return }
             state = .preparing
-            let engine = engineProvider()
+            guard let engine = activeEngine, let configuration = activeConfiguration else { return }
             try await engine.prepare()
 
             guard isCurrent(generation) else { return }
             state = .generating
-            let configuration = configurationProvider()
-            try await player.startSession(generation, speed: configuration.speed)
+            try await player.startSession(generation, speed: engine.handlesSpeechSpeed ? 1.0 : configuration.speed)
 
             var deliveredFirstChunk = false
             let stream = engine.generate(text: normalized.text, configuration: configuration)
@@ -213,25 +226,23 @@ final class SpeechCoordinator {
     private func finishCurrentRead() {
         readingTask = nil
         currentGeneration = nil
+        activeConfiguration = nil
+        activeEngine = nil
         state = .idle
         refreshAvailability()
     }
 
     private func failCurrentRead(generation: UUID, error: UserFacingSpeechError) async {
+        guard isCurrent(generation) else { return }
         await player.stopImmediately()
         guard isCurrent(generation) else { return }
         readingTask = nil
         currentGeneration = nil
+        activeConfiguration = nil
+        activeEngine = nil
         state = .failed(error)
         AppLogger.speech.error("Read failed: \(error.errorDescription ?? "unknown")")
-        // Surface the error briefly, then return to the resting state.
-        failureResetTask = Task { [weak self] in
-            try? await Task.sleep(for: .seconds(6))
-            guard let self, !Task.isCancelled else { return }
-            if case .failed = self.state {
-                self.state = .idle
-                self.refreshAvailability()
-            }
-        }
+        // Keep recovery information available until the next read or an
+        // availability change. Opening Settings must not race a timeout.
     }
 }

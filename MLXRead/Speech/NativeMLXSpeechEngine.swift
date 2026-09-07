@@ -22,6 +22,7 @@ actor NativeMLXSpeechEngine: SpeechEngine {
     nonisolated var identifier: String { modelInfo.id }
     nonisolated var displayName: String { modelInfo.displayName }
     nonisolated var sampleRate: Double { modelInfo.nominalSampleRate }
+    nonisolated var handlesSpeechSpeed: Bool { modelInfo.id == ModelManifest.kokoro.id }
 
     private var model: SpeechGenerationModel?
     private var prepareTask: Task<Void, Error>?
@@ -104,6 +105,11 @@ actor NativeMLXSpeechEngine: SpeechEngine {
             try await prepare()
             guard let model else {
                 throw UserFacingSpeechError.modelLoadFailed("model unavailable after prepare")
+            }
+            if let kokoro = model as? KokoroModel {
+                // Let the model adjust phoneme durations before generating audio.
+                // Soprano has no equivalent; its rate stays in the audio player.
+                kokoro.speed = Float(configuration.speed.isFinite ? min(max(configuration.speed, 0.5), 2.0) : 1.0)
             }
             let pieces = TextChunker.chunk(text)
             AppLogger.speech.info("Generating \(pieces.count) chunk(s), \(text.count) chars total")

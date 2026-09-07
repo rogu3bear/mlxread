@@ -15,7 +15,10 @@ import Observation
 @Observable
 final class ModelStore {
     let rootDirectory: URL
-    private(set) var states: [String: ModelDownloadState] = [:]
+    private(set) var states: [String: ModelDownloadState] = [:] {
+        didSet { onStateChange?() }
+    }
+    var onStateChange: (() -> Void)?
     private var downloadTasks: [String: Task<Void, Never>] = [:]
 
     /// Must run before any HubCache.default access anywhere in the process.
@@ -137,11 +140,15 @@ final class ModelStore {
 
     // MARK: - Removal & inspection
 
-    func remove(_ model: ModelInfo) throws {
+    func remove(_ model: ModelInfo, movingToTrash: Bool = false) throws {
         cancelDownload(model)
         let dir = directory(for: model)
         if FileManager.default.fileExists(atPath: dir.path) {
-            try FileManager.default.removeItem(at: dir)
+            if movingToTrash {
+                try FileManager.default.trashItem(at: dir, resultingItemURL: nil)
+            } else {
+                try FileManager.default.removeItem(at: dir)
+            }
         }
         states[model.id] = .notDownloaded
         AppLogger.models.info("Removed model \(model.id)")

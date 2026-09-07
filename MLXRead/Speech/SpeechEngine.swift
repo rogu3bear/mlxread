@@ -11,6 +11,9 @@ protocol SpeechEngine: Sendable {
     /// Nominal output sample rate. Individual chunks carry their own
     /// authoritative rate (the loaded model is the source of truth).
     var sampleRate: Double { get }
+    /// True when generation applies configuration.speed to speech duration.
+    /// The player must then stay at 1× to avoid applying the rate twice.
+    var handlesSpeechSpeed: Bool { get }
 
     func prepare() async throws
 
@@ -20,4 +23,8 @@ protocol SpeechEngine: Sendable {
     ) -> AsyncThrowingStream<SpeechAudioChunk, Error>
 
     func cancel() async
+}
+
+extension SpeechEngine {
+    var handlesSpeechSpeed: Bool { false }
 }

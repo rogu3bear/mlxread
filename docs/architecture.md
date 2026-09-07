@@ -34,7 +34,7 @@ permissionRequired / modelRequired  (resting gates, recomputed when idle)
 idle ─⌥⎋─► capturing ─► preparing ─► generating ─► playing ─► idle
   ▲                                     │             │
   └──────── stopping ◄──── ⌥⎋ ──────────┴─────────────┘
-failed(error)  (any step; auto-clears back to idle after a few seconds)
+failed(error)  (any step; retained until the next read or availability change)
 ```
 
 Every read gets a **generation UUID**. The UUID is checked:
@@ -84,6 +84,17 @@ The UI (menu bar, settings tabs, HUD, onboarding) only ever observes
 Mocks (`MockSpeechEngine`, fakes in tests) implement the same protocols
 (`SpeechEngine`, `SelectionCapturing`, `AudioPlaying`), which is how the
 entire pipeline is exercised without a model.
+
+Each reading snapshots its engine and configuration before asynchronous work.
+Stop cancels that engine even if settings change. Kokoro applies the requested
+rate to phoneme durations during synthesis (`handlesSpeechSpeed`); its player
+rate stays at 1×. Soprano uses `AVAudioUnitTimePitch` for playback rate. The HUD
+shows the active snapshot's rate, and setting changes affect the next reading.
+
+Preview bypasses selection capture and its Accessibility gate, while retaining
+a separate model-availability gate. Missing models require an explicit download.
+Preview text lives only in the Voice view's memory and never comes from captured
+selections. Model-store state changes refresh the coordinator's resting state.
 
 A future `KokoroSpeechEngine` or any other backend implements `SpeechEngine`
 and plugs into `AppState`'s engine provider; selection, hotkey, playback, and

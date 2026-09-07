@@ -12,9 +12,9 @@ assets, deliver updates, and support users.
 - **Reading content is never logged.** `AppLogger` records lengths, counts,
   durations, states, and error descriptions. The invariant applies to every log
   line included in a diagnostic report.
-- **Optional preview is off by default.** Settings → General has a selection
-  preview toggle; nothing in the UI displays captured text unless the user
-  enables it.
+- **Captured text is not displayed.** Voice settings has an editable preview
+  passage that stays in memory. It is never populated from captured selections
+  and is never saved to preferences or included in diagnostics.
 - **Clipboard fallback is narrow but observable to local software.** The app
   snapshots the general pasteboard, synthesizes Command-C, reads the fresh text,
   and restores the snapshot only when `changeCount` proves nothing else wrote in

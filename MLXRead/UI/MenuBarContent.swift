@@ -13,7 +13,7 @@ struct MenuBarContent: View {
             Text(statusLine)
 
             if coordinator.lastReadWasTruncated {
-                Text("Last selection was truncated to the length limit")
+                Text("Selection shortened to limit")
             }
 
             Divider()
@@ -22,7 +22,8 @@ struct MenuBarContent: View {
                 coordinator.beginReadingSelection()
             }
             .keyboardShortcut("r")
-            .disabled(coordinator.state.isBusy)
+            .disabled(coordinator.state.isBusy || !permissions.isTrusted ||
+                      modelStore.state(for: settings.selectedModel) != .downloaded)
 
             Button("Stop") {
                 coordinator.stop()
@@ -37,22 +38,27 @@ struct MenuBarContent: View {
                     Text(model.displayName).tag(model.id)
                 }
             }
+            .disabled(coordinator.state.isBusy)
 
             if settings.selectedModel.supportsVoices {
                 let voices = modelStore.availableVoices(for: settings.selectedModel)
                 if !voices.isEmpty {
                     Picker("Voice", selection: voiceBinding) {
                         ForEach(voices, id: \.self) { voice in
-                            Text(voice).tag(voice)
+                            Text(String(VoiceOption(id: voice).menuLabel.prefix(30))).tag(voice)
                         }
                     }
+                    .disabled(coordinator.state.isBusy)
                 }
             }
 
             Picker("Speed", selection: speedBinding) {
-                ForEach([0.8, 1.0, 1.25, 1.5, 2.0], id: \.self) { speed in
+                ForEach(Array(Set([0.5, 0.8, 1.0, 1.25, 1.5, 2.0, settings.speechSpeed])).sorted(), id: \.self) { speed in
                     Text(String(format: "%g×", speed)).tag(speed)
                 }
+            }
+            if coordinator.state.isBusy {
+                Text("Speed applies to next reading")
             }
 
             Divider()
@@ -81,20 +87,18 @@ struct MenuBarContent: View {
     }
 
     private var statusLine: String {
-        var line = coordinator.state.displayName
         if case .downloading(let fraction) = modelStore.state(for: settings.selectedModel) {
-            line += " — downloading \(Int(fraction * 100))%"
+            return "Downloading voice · \(Int(max(0, min(1, fraction)) * 100))%"
         }
-        return line
+        return coordinator.state.displayName
     }
 
     private var modelBinding: Binding<String> {
         Binding(
             get: { settings.selectedModelID },
             set: { newValue in
-                settings.selectedModelID = newValue
                 if let model = ModelManifest.model(withID: newValue) {
-                    settings.selectedVoice = model.defaultVoice ?? ""
+                    settings.selectModel(model)
                 }
                 coordinator.refreshAvailability()
             }

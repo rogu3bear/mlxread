@@ -20,7 +20,6 @@ enum Constants {
         static let showPlaybackHUD = "showPlaybackHUD"
         static let maximumSelectionLength = "maximumSelectionLength"
         static let onboardingCompleted = "onboardingCompleted"
-        static let showSelectionPreview = "showSelectionPreview"
         static let reporterEmail = "reporterEmail"
     }
 
@@ -29,7 +28,6 @@ enum Constants {
         static let clipboardFallbackEnabled = true
         static let showPlaybackHUD = false
         static let maximumSelectionLength = 20_000
-        static let showSelectionPreview = false
     }
 
     /// Hard bounds for the user-configurable maximum selection length.

@@ -19,7 +19,7 @@ struct MLXReadApp: App {
         }
 
         Settings {
-            SettingsView()
+            SettingsView(showSetup: appDelegate.showOnboarding)
                 .environment(appDelegate.appState.coordinator)
                 .environment(appDelegate.appState.settings)
                 .environment(appDelegate.appState.modelStore)

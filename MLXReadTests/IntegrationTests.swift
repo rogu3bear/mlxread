@@ -113,6 +113,28 @@ final class IntegrationTests: XCTestCase {
         XCTAssertGreaterThan(seconds, 1.0)
     }
 
+    func testKokoroNativeSpeedChangesDuration() async throws {
+        let engine = NativeMLXSpeechEngine(modelInfo: ModelManifest.kokoro)
+        let passage = VoiceOption(id: "af_heart").sampleText
+        let normal = try await collectChunks(engine: engine, text: passage,
+                                            configuration: SpeechConfiguration(voice: "af_heart", speed: 1.0))
+        let faster = try await collectChunks(engine: engine, text: passage,
+                                            configuration: SpeechConfiguration(voice: "af_heart", speed: 1.5))
+        let restored = try await collectChunks(engine: engine, text: passage,
+                                              configuration: SpeechConfiguration(voice: "af_heart", speed: 1.0))
+        assertValidAudio(normal, expectedRate: 24_000)
+        assertValidAudio(faster, expectedRate: 24_000)
+        assertValidAudio(restored, expectedRate: 24_000)
+        let normalDuration = normal.reduce(0) { $0 + $1.duration }
+        let fasterDuration = faster.reduce(0) { $0 + $1.duration }
+        let restoredDuration = restored.reduce(0) { $0 + $1.duration }
+        XCTAssertTrue(engine.handlesSpeechSpeed)
+        XCTAssertFalse(NativeMLXSpeechEngine(modelInfo: ModelManifest.soprano).handlesSpeechSpeed)
+        XCTAssertLessThan(fasterDuration, normalDuration * 0.85)
+        XCTAssertEqual(restoredDuration, normalDuration, accuracy: normalDuration * 0.05)
+        print("VOICE_RATE|normal_seconds=\(normalDuration)|faster_seconds=\(fasterDuration)|restored_seconds=\(restoredDuration)")
+    }
+
     func testKokoroChunkOrderingForMultiSentenceText() async throws {
         let engine = NativeMLXSpeechEngine(modelInfo: ModelManifest.kokoro)
         try await engine.prepare()

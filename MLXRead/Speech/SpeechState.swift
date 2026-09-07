@@ -26,15 +26,15 @@ enum SpeechState: Equatable {
     var displayName: String {
         switch self {
         case .unavailable: return "Unavailable"
-        case .permissionRequired: return "Permission required"
-        case .modelRequired: return "Model required"
-        case .idle: return "Idle"
-        case .capturing: return "Capturing selection…"
-        case .preparing: return "Preparing model…"
-        case .generating: return "Generating…"
+        case .permissionRequired: return "Allow access in Settings"
+        case .modelRequired: return "Download a voice in Settings"
+        case .idle: return "Ready to read"
+        case .capturing: return "Getting selected text…"
+        case .preparing: return "Loading voice…"
+        case .generating: return "Preparing speech…"
         case .playing: return "Speaking"
         case .stopping: return "Stopping…"
-        case .failed(let error): return error.errorDescription ?? "Error"
+        case .failed: return "Couldn’t read · open Settings"
         }
     }
 }

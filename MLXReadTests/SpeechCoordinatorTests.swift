@@ -21,11 +21,13 @@ actor FakeAudioPlayer: AudioPlaying {
     private(set) var enqueuedChunks: [(UUID, Int)] = []
     private(set) var finishedSessions: [UUID] = []
     private(set) var stopCount = 0
+    private(set) var playbackSpeeds: [Double] = []
     private var activeSession: UUID?
 
     func startSession(_ id: UUID, speed: Double) async throws {
         activeSession = id
         startedSessions.append(id)
+        playbackSpeeds.append(speed)
     }
 
     func enqueue(_ chunk: SpeechAudioChunk, session: UUID) async throws {
@@ -50,15 +52,17 @@ actor GatedEngine: SpeechEngine {
     nonisolated let identifier = "gated"
     nonisolated let displayName = "Gated"
     nonisolated let sampleRate: Double = 24_000
+    nonisolated let handlesSpeechSpeed: Bool
 
     private(set) var prepareCount = 0
     private(set) var cancelCount = 0
     let chunkCount: Int
     let chunkDelay: Duration
 
-    init(chunkCount: Int = 3, chunkDelay: Duration = .milliseconds(20)) {
+    init(chunkCount: Int = 3, chunkDelay: Duration = .milliseconds(20), handlesSpeechSpeed: Bool = false) {
         self.chunkCount = chunkCount
         self.chunkDelay = chunkDelay
+        self.handlesSpeechSpeed = handlesSpeechSpeed
     }
 
     func prepare() async throws {
@@ -142,6 +146,73 @@ final class SpeechCoordinatorTests: XCTestCase {
         XCTAssertEqual(chunks.count, 3)
         XCTAssertEqual(chunks.map(\.1), [0, 1, 2], "chunks must play in order")
         XCTAssertEqual(finished.count, 1)
+    }
+
+    func testSampleRequiresModelButNotSelectionPermission() async throws {
+        let engine = GatedEngine(chunkCount: 1)
+        let coordinator = makeCoordinator(engine: engine)
+        coordinator.availabilityCheck = { .permissionRequired }
+        coordinator.sampleAvailabilityCheck = { .modelRequired }
+        coordinator.speakSample("A local preview.")
+        XCTAssertEqual(coordinator.state, .modelRequired)
+        let prepareCount = await engine.prepareCount
+        XCTAssertEqual(prepareCount, 0)
+
+        coordinator.sampleAvailabilityCheck = { nil }
+        coordinator.speakSample("A local preview.")
+        XCTAssertEqual(coordinator.state, .preparing)
+        try await waitUntil { !coordinator.state.isBusy }
+        let prepared = await engine.prepareCount
+        XCTAssertEqual(prepared, 1)
+        XCTAssertEqual(coordinator.state, .permissionRequired)
+    }
+
+    func testEmptyPreviewDoesNotStartAnEngine() async throws {
+        let engine = GatedEngine()
+        let coordinator = makeCoordinator(engine: engine)
+        coordinator.speakSample(" \n ")
+        XCTAssertEqual(coordinator.state, .idle)
+        let prepareCount = await engine.prepareCount
+        XCTAssertEqual(prepareCount, 0)
+    }
+
+    func testNativeSpeedIsNotAppliedTwiceAndConfigurationIsFrozen() async throws {
+        for nativeSpeed in [true, false] {
+            let player = FakeAudioPlayer()
+            let engine = GatedEngine(chunkCount: 1, handlesSpeechSpeed: nativeSpeed)
+            var chosenSpeed = 1.5
+            let coordinator = SpeechCoordinator(
+                selection: FakeSelectionReader(), player: player,
+                engineProvider: { engine },
+                configurationProvider: { SpeechConfiguration(speed: chosenSpeed) }
+            )
+            coordinator.speakSample("A stable preview.")
+            chosenSpeed = 0.8
+            XCTAssertEqual(coordinator.activeConfiguration?.speed, 1.5)
+            try await waitUntil { coordinator.state == .idle }
+            let speeds = await player.playbackSpeeds
+            XCTAssertEqual(speeds, [nativeSpeed ? 1.0 : 1.5])
+            XCTAssertNil(coordinator.activeConfiguration)
+        }
+    }
+
+    func testStopCancelsTheEngineThatStartedTheRead() async throws {
+        let original = GatedEngine(chunkCount: 50, chunkDelay: .milliseconds(50))
+        let replacement = GatedEngine()
+        var selected: any SpeechEngine = original
+        let coordinator = SpeechCoordinator(
+            selection: FakeSelectionReader(), player: FakeAudioPlayer(),
+            engineProvider: { selected }, configurationProvider: { SpeechConfiguration() }
+        )
+        coordinator.speakSample("Keep the original reading cancellable.")
+        try await waitUntil { coordinator.state == .playing }
+        selected = replacement
+        coordinator.stop()
+        try await waitUntil { coordinator.state == .idle }
+        let originalCancellations = await original.cancelCount
+        let replacementCancellations = await replacement.cancelCount
+        XCTAssertEqual(originalCancellations, 1)
+        XCTAssertEqual(replacementCancellations, 0)
     }
 
     func testStopDuringGenerationCancelsAndReturnsToIdle() async throws {

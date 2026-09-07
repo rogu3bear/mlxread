@@ -16,7 +16,7 @@ struct OnboardingView: View {
                 VStack(alignment: .leading) {
                     Text("Welcome to MLXRead")
                         .font(.title2.bold())
-                    Text("Press ⌥⎋ to hear any selected text, spoken by a local model.")
+                    Text("Select text. Press Option–Escape. Listen.")
                         .foregroundStyle(.secondary)
                 }
             }
@@ -25,25 +25,26 @@ struct OnboardingView: View {
 
             VStack(alignment: .leading, spacing: 10) {
                 Label {
-                    Text("MLXRead needs **Accessibility** access to read the current selection and to listen for Option–Escape. Nothing is sent off this Mac.")
+                    Text("Allow **Accessibility** access so MLXRead can read selected text and respond to Option–Escape. Your reading text stays on this Mac.")
                 } icon: {
                     Image(systemName: permissions.isTrusted ? "checkmark.circle.fill" : "1.circle")
                         .foregroundStyle(permissions.isTrusted ? .green : .primary)
                 }
 
                 Label {
-                    Text("If Apple’s built-in **Speak selection** is enabled with the same shortcut, disable or reassign it under System Settings → Accessibility → Spoken Content. MLXRead won’t change it for you.")
+                    Text("If macOS **Speak Selection** also uses Option–Escape, change its shortcut in System Settings → Accessibility → Spoken Content.")
                 } icon: {
                     Image(systemName: "2.circle")
                 }
 
                 Label {
-                    Text("Download a voice model once in Settings → Models. After that, MLXRead works fully offline.")
+                    Text("Open **Voice settings**, download a model, and preview a voice. The first preview prepares pronunciation files for that language; later readings can work offline.")
                 } icon: {
                     Image(systemName: "3.circle")
                 }
             }
-            .font(.callout)
+            .font(.body)
+            .fixedSize(horizontal: false, vertical: true)
 
             Divider()
 
@@ -58,16 +59,17 @@ struct OnboardingView: View {
                     .buttonStyle(.borderedProminent)
                 }
                 Spacer()
-                Button("Done") {
+                Button("Close Setup") {
                     settings.onboardingCompleted = true
                     appState.installHotkeyIfPossible()
                     dismiss()
                 }
                 .keyboardShortcut(.defaultAction)
             }
+            SettingsLink { Text("Open Settings…") }
         }
         .padding(24)
-        .frame(width: 480)
+        .frame(width: 560)
     }
 }
 
@@ -98,14 +100,14 @@ final class OnboardingWindowController {
             let hosting = NSHostingView(rootView: AnyView(view))
             hosting.sizingOptions = []
             let window = NSWindow(
-                contentRect: NSRect(x: 0, y: 0, width: 480, height: 440),
+                contentRect: NSRect(x: 0, y: 0, width: 560, height: 460),
                 styleMask: [.titled, .closable],
                 backing: .buffered,
                 defer: false
             )
             window.title = "MLXRead Setup"
             window.isReleasedWhenClosed = false
-            hosting.frame = NSRect(x: 0, y: 0, width: 480, height: 440)
+            hosting.frame = NSRect(x: 0, y: 0, width: 560, height: 460)
             window.contentView = hosting
             window.center()
             self.window = window

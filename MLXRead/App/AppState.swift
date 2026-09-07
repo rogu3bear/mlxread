@@ -10,7 +10,16 @@ final class AppSettings {
 
     var selectedModelID: String { didSet { defaults.set(selectedModelID, forKey: Constants.DefaultsKey.selectedModelID) } }
     var selectedVoice: String { didSet { defaults.set(selectedVoice, forKey: Constants.DefaultsKey.selectedVoice) } }
-    var speechSpeed: Double { didSet { defaults.set(speechSpeed, forKey: Constants.DefaultsKey.speechSpeed) } }
+    var speechSpeed: Double {
+        didSet {
+            let bounded = speechSpeed.isFinite ? min(max(speechSpeed, 0.5), 2.0) : 1.0
+            if !speechSpeed.isFinite || speechSpeed != bounded {
+                speechSpeed = bounded
+                return
+            }
+            defaults.set(speechSpeed, forKey: Constants.DefaultsKey.speechSpeed)
+        }
+    }
     var clipboardFallbackEnabled: Bool { didSet { defaults.set(clipboardFallbackEnabled, forKey: Constants.DefaultsKey.clipboardFallbackEnabled) } }
     var showPlaybackHUD: Bool { didSet { defaults.set(showPlaybackHUD, forKey: Constants.DefaultsKey.showPlaybackHUD) } }
     var maximumSelectionLength: Int {
@@ -27,7 +36,6 @@ final class AppSettings {
         }
     }
     var onboardingCompleted: Bool { didSet { defaults.set(onboardingCompleted, forKey: Constants.DefaultsKey.onboardingCompleted) } }
-    var showSelectionPreview: Bool { didSet { defaults.set(showSelectionPreview, forKey: Constants.DefaultsKey.showSelectionPreview) } }
     var reporterEmail: String { didSet { defaults.set(reporterEmail, forKey: Constants.DefaultsKey.reporterEmail) } }
 
     init(defaults: UserDefaults = .standard) {
@@ -35,18 +43,24 @@ final class AppSettings {
         selectedModelID = defaults.string(forKey: Constants.DefaultsKey.selectedModelID) ?? ModelManifest.defaultModel.id
         selectedVoice = defaults.string(forKey: Constants.DefaultsKey.selectedVoice) ?? (ModelManifest.defaultModel.defaultVoice ?? "")
         let speed = defaults.double(forKey: Constants.DefaultsKey.speechSpeed)
-        speechSpeed = speed == 0 ? Constants.Defaults.speechSpeed : speed
+        speechSpeed = speed == 0 || !speed.isFinite ? Constants.Defaults.speechSpeed : min(max(speed, 0.5), 2.0)
         clipboardFallbackEnabled = defaults.object(forKey: Constants.DefaultsKey.clipboardFallbackEnabled) as? Bool ?? Constants.Defaults.clipboardFallbackEnabled
         showPlaybackHUD = defaults.object(forKey: Constants.DefaultsKey.showPlaybackHUD) as? Bool ?? Constants.Defaults.showPlaybackHUD
         let storedMax = defaults.integer(forKey: Constants.DefaultsKey.maximumSelectionLength)
         maximumSelectionLength = storedMax == 0 ? Constants.Defaults.maximumSelectionLength : storedMax.clamped(to: Constants.selectionLengthBounds)
         onboardingCompleted = defaults.bool(forKey: Constants.DefaultsKey.onboardingCompleted)
-        showSelectionPreview = defaults.object(forKey: Constants.DefaultsKey.showSelectionPreview) as? Bool ?? Constants.Defaults.showSelectionPreview
         reporterEmail = defaults.string(forKey: Constants.DefaultsKey.reporterEmail) ?? ""
     }
 
     var selectedModel: ModelInfo {
         ModelManifest.model(withID: selectedModelID) ?? ModelManifest.defaultModel
+    }
+
+    func selectModel(_ model: ModelInfo) {
+        guard selectedModelID != model.id else { return }
+        defaults.set(selectedVoice, forKey: "voice.\(selectedModelID)")
+        selectedModelID = model.id
+        selectedVoice = defaults.string(forKey: "voice.\(model.id)") ?? model.defaultVoice ?? ""
     }
 
     var speechConfiguration: SpeechConfiguration {
@@ -140,6 +154,15 @@ final class AppState {
                 if self.modelStore.state(for: model) != .downloaded { return .modelRequired }
             }
             return nil
+        }
+        // A built-in preview needs model assets, but reads no other app's text.
+        coordinator.sampleAvailabilityCheck = { [weak self] in
+            guard let self else { return .unavailable }
+            return self.usesMockEngine || self.modelStore.state(for: self.settings.selectedModel) == .downloaded
+                ? nil : .modelRequired
+        }
+        modelStore.onStateChange = { [weak self] in
+            self?.coordinator.refreshAvailability()
         }
         permissions.onChange = { [weak self] trusted in
             guard let self else { return }

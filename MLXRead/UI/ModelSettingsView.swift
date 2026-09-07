@@ -3,9 +3,15 @@ import SwiftUI
 struct ModelSettingsView: View {
     @Environment(ModelStore.self) private var modelStore
     @Environment(SpeechCoordinator.self) private var coordinator
+    @Environment(AppSettings.self) private var settings
+    @State private var removalError: String?
 
     var body: some View {
         Form {
+            Section {
+                Text("Voices that stay on your Mac").font(.title2.weight(.semibold))
+                Text("Download a model to add local speech. One model is enough to get started.")
+            }
             ForEach(ModelManifest.all) { model in
                 Section(model.displayName) {
                     modelRow(model)
@@ -13,8 +19,11 @@ struct ModelSettingsView: View {
             }
             Section {
                 LabeledContent("Total disk usage", value: format(bytes: modelStore.totalDiskUsageBytes()))
-                Button("Reveal model directory in Finder") {
+                Button("Show Downloaded Files in Finder") {
                     modelStore.revealInFinder()
+                }
+                if let removalError {
+                    Text(removalError).fixedSize(horizontal: false, vertical: true)
                 }
             }
         }
@@ -25,33 +34,54 @@ struct ModelSettingsView: View {
 
     @ViewBuilder
     private func modelRow(_ model: ModelInfo) -> some View {
-        LabeledContent("Repository", value: model.id)
-        LabeledContent("License", value: model.weightsLicense)
+        Text(model.summary)
+        if settings.selectedModelID == model.id {
+            Label("Selected for reading", systemImage: "checkmark.circle")
+        }
         switch modelStore.state(for: model) {
         case .notDownloaded:
-            LabeledContent("Status", value: "Not downloaded (~\(model.approximateSizeMB) MB)")
-            Button("Download") { modelStore.download(model) }
+            Text("Download size: about \(model.approximateSizeMB) MB")
+                .foregroundStyle(.secondary)
+            Button("Download \(model.displayName)") { modelStore.download(model) }
         case .downloading(let fraction):
             VStack(alignment: .leading, spacing: 4) {
                 ProgressView(value: max(0.0, min(1.0, fraction))) {
                     Text("Downloading… \(Int(fraction * 100))%")
                 }
-                Button("Cancel") { modelStore.cancelDownload(model) }
+                Button("Cancel Download") { modelStore.cancelDownload(model) }
             }
         case .downloaded:
-            LabeledContent("Status", value: "Downloaded")
+            Label("Ready to use", systemImage: "checkmark.circle")
             LabeledContent("Disk usage", value: format(bytes: modelStore.diskUsageBytes(for: model)))
-            Button("Remove", role: .destructive) {
-                try? modelStore.remove(model)
-                coordinator.refreshAvailability()
+            HStack(spacing: 16) {
+                if settings.selectedModelID != model.id {
+                    Button("Use for Reading") {
+                        settings.selectModel(model)
+                        coordinator.refreshAvailability()
+                    }
+                }
+                Button("Move to Trash", role: .destructive) {
+                    do {
+                        try modelStore.remove(model, movingToTrash: true)
+                        removalError = nil
+                        coordinator.refreshAvailability()
+                    } catch {
+                        removalError = "Couldn’t remove \(model.displayName). \(error.localizedDescription)"
+                    }
+                }
             }
             .disabled(coordinator.state.isBusy)
+            Text("Restore the folder from Trash or download it again to use this model later.")
+                .foregroundStyle(.secondary)
         case .failed(let message):
-            LabeledContent("Status", value: "Failed")
-            Text(message)
-                .font(.caption)
-                .foregroundStyle(.red)
-            Button("Retry") { modelStore.download(model) }
+            Text("Download didn’t finish. Check your connection and try again.")
+            DisclosureGroup("Download details") { Text(message).textSelection(.enabled) }
+            Button("Retry Download") { modelStore.download(model) }
+        }
+        DisclosureGroup("Model details") {
+            LabeledContent("Source", value: model.id)
+                .textSelection(.enabled)
+            LabeledContent("License", value: model.weightsLicense)
         }
     }
 

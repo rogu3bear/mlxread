@@ -65,7 +65,14 @@ Metal kernels need the Xcode build system.
 | ⌥⎋ with text selected | Selection is captured, synthesized sentence-by-sentence, playback starts as soon as the first chunk is ready |
 | ⌥⎋ while reading | Generation cancelled, playback stopped, queue cleared — immediately |
 | Menu bar → Read Selection / Stop | Same as the shortcut |
-| Settings → Voice | Model, voice (Kokoro), speed (0.5–2×), test phrase |
+| Settings → Voice | Voices by name and language, speed (0.5–2×), editable local preview |
+
+Voice settings opens first. Choose a model, a language and voice (Kokoro), then
+use **Preview Voice** to compare the same passage. The sample changes with the
+language, and preview text is never saved. Downloading a missing model is an
+explicit action; a preview does not need Accessibility access. Kokoro adjusts
+speech timing during synthesis; Soprano uses pitch-preserving playback speed.
+Voice and speed changes apply to the next reading.
 
 Long selections are truncated at a configurable limit (default 20,000
 characters) at a word boundary; truncation is indicated in the menu.

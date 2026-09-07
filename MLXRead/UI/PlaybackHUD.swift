@@ -13,9 +13,11 @@ struct PlaybackHUDView: View {
         HStack(spacing: 10) {
             Image(systemName: coordinator.state == .playing ? "waveform" : "hourglass")
                 .symbolEffect(.variableColor.iterative, isActive: coordinator.state.isBusy)
+                .accessibilityHidden(true)
             Text(coordinator.state.displayName)
-                .font(.callout)
+                .font(.body)
                 .lineLimit(1)
+                .frame(width: 160, alignment: .leading)
 
             Button {
                 coordinator.stop()
@@ -23,11 +25,14 @@ struct PlaybackHUDView: View {
                 Image(systemName: "stop.fill")
             }
             .buttonStyle(.bordered)
+            .accessibilityLabel("Stop reading")
+            .help("Stop reading (Option–Escape)")
             .disabled(!coordinator.state.isBusy)
 
-            Text(String(format: "%.2f×", settings.speechSpeed))
-                .font(.caption.monospacedDigit())
+            Text(String(format: "%g×", coordinator.activeConfiguration?.speed ?? settings.speechSpeed))
+                .font(.body.monospacedDigit())
                 .foregroundStyle(.secondary)
+                .frame(width: 44, alignment: .trailing)
 
             Button {
                 onClose()
@@ -35,6 +40,8 @@ struct PlaybackHUDView: View {
                 Image(systemName: "xmark")
             }
             .buttonStyle(.borderless)
+            .accessibilityLabel("Hide playback controls")
+            .help("Hide controls for this reading; speech continues")
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 8)

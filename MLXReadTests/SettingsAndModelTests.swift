@@ -23,7 +23,6 @@ final class AppSettingsTests: XCTestCase {
         XCTAssertEqual(settings.speechSpeed, 1.0)
         XCTAssertTrue(settings.clipboardFallbackEnabled)
         XCTAssertFalse(settings.showPlaybackHUD)
-        XCTAssertFalse(settings.showSelectionPreview)
         XCTAssertEqual(settings.maximumSelectionLength, Constants.Defaults.maximumSelectionLength)
     }
 
@@ -58,6 +57,43 @@ final class AppSettingsTests: XCTestCase {
         settings.selectedModelID = ModelManifest.kokoro.id
         settings.selectedVoice = "af_bella"
         XCTAssertEqual(settings.speechConfiguration.voice, "af_bella")
+    }
+
+    func testSwitchingModelsRestoresChosenVoice() {
+        let settings = AppSettings(defaults: defaults)
+        settings.selectedVoice = "bf_emma"
+        settings.selectModel(ModelManifest.soprano)
+        XCTAssertNil(settings.speechConfiguration.voice)
+        settings.selectModel(ModelManifest.kokoro)
+        XCTAssertEqual(settings.selectedVoice, "bf_emma")
+        settings.selectModel(ModelManifest.soprano)
+        let reloaded = AppSettings(defaults: defaults)
+        reloaded.selectModel(ModelManifest.kokoro)
+        XCTAssertEqual(reloaded.selectedVoice, "bf_emma")
+    }
+
+    func testSpeedStaysWithinSupportedRange() {
+        let settings = AppSettings(defaults: defaults)
+        settings.speechSpeed = 20
+        XCTAssertEqual(settings.speechSpeed, 2)
+        settings.speechSpeed = -1
+        XCTAssertEqual(settings.speechSpeed, 0.5)
+        settings.speechSpeed = .nan
+        XCTAssertEqual(settings.speechSpeed, 1)
+        defaults.set(4.0, forKey: Constants.DefaultsKey.speechSpeed)
+        XCTAssertEqual(AppSettings(defaults: defaults).speechSpeed, 2)
+    }
+}
+
+final class VoiceOptionTests: XCTestCase {
+    func testVoiceLabelsAndLanguageSamples() {
+        XCTAssertEqual(VoiceOption(id: "af_heart").name, "Heart")
+        XCTAssertEqual(VoiceOption(id: "bf_emma").languageName, "English (UK)")
+        XCTAssertEqual(VoiceOption(id: "pf_dora").menuLabel, "Dora · Portuguese (Brazil)")
+        XCTAssertNotEqual(VoiceOption(id: "ff_siwis").sampleText, VoiceOption(id: "af_heart").sampleText)
+        XCTAssertEqual(VoiceOption(id: "af_bella").sampleText, VoiceOption(id: "af_heart").sampleText)
+        XCTAssertEqual(VoiceOption(id: "custom_voice").name, "custom_voice")
+        XCTAssertEqual(VoiceOption(id: "custom_voice").languageCode, "other")
     }
 }
 

@@ -12,7 +12,6 @@ struct PermissionView: View {
                         permissions.isTrusted ? "Granted" : "Not granted",
                         systemImage: permissions.isTrusted ? "checkmark.circle.fill" : "xmark.circle.fill"
                     )
-                    .foregroundStyle(permissions.isTrusted ? .green : .red)
                 }
 
                 // Trust and "tap actually installed" are distinct: the app
@@ -23,16 +22,12 @@ struct PermissionView: View {
                         shortcutStatus.text,
                         systemImage: shortcutStatus.symbol
                     )
-                    .foregroundStyle(shortcutStatus.color)
                 }
 
-                Text("MLXRead reads the frontmost app's selected text through the macOS Accessibility API, and its Option–Escape shortcut is a keyboard event tap. Both require Accessibility access. Selected text never leaves this Mac.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                Text("Allow MLXRead to read selected text in other apps and respond to Option–Escape. Your reading text stays on this Mac.")
 
                 if !permissions.isTrusted {
-                    Text("If you revoke access later, MLXRead removes its keyboard tap immediately and stops any active reading.")
-                        .font(.caption)
+                    Text("You can turn access off in System Settings at any time. MLXRead then stops reading and disables its shortcut.")
                         .foregroundStyle(.secondary)
                 }
 
@@ -41,7 +36,7 @@ struct PermissionView: View {
                         Button("Grant Access…") { permissions.requestAccess() }
                             .buttonStyle(.borderedProminent)
                     }
-                    Button("Open System Settings") { permissions.openSystemSettings() }
+                    Button("Open Accessibility Settings") { permissions.openSystemSettings() }
                     Button("Recheck") {
                         permissions.refresh()
                         appState.installHotkeyIfPossible()
@@ -53,13 +48,13 @@ struct PermissionView: View {
         .padding(.bottom, 8)
     }
 
-    private var shortcutStatus: (text: String, symbol: String, color: Color) {
+    private var shortcutStatus: (text: String, symbol: String) {
         if !permissions.isTrusted {
-            return ("Needs Accessibility access", "xmark.circle.fill", .red)
+            return ("Needs Accessibility access", "xmark.circle.fill")
         }
         if appState.hotkeyInstalled {
-            return ("Active", "checkmark.circle.fill", .green)
+            return ("Active", "checkmark.circle.fill")
         }
-        return ("Not installed — click Recheck", "exclamationmark.triangle.fill", .orange)
+        return ("Not active — click Recheck", "exclamationmark.triangle.fill")
     }
 }

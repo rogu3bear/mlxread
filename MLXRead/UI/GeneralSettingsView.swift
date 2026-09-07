@@ -1,56 +1,54 @@
 import SwiftUI
 
 struct GeneralSettingsView: View {
+    var showSetup: () -> Void
     @Environment(AppSettings.self) private var settings
     @Environment(AppState.self) private var appState
-    @Environment(AccessibilityPermissionService.self) private var permissions
     @Environment(UpdateService.self) private var updates
 
     var body: some View {
         @Bindable var settings = settings
         Form {
-            Section {
-                LabeledContent("Global shortcut") {
-                    HStack(spacing: 6) {
-                        Text(HotkeyConfiguration.optionEscape.displayString)
-                            .font(.title3.monospaced())
-                        Text(appState.hotkeyInstalled ? "active" : (permissions.isTrusted ? "not installed" : "needs Accessibility permission"))
-                            .foregroundStyle(appState.hotkeyInstalled ? .green : .secondary)
-                    }
+            Section("Read selected text") {
+                LabeledContent("Keyboard shortcut") {
+                    Text("⌥ Esc · Option–Escape").font(.body.weight(.medium))
                 }
-                Text("If macOS’s built-in “Speak selection” uses the same shortcut, disable or reassign it in System Settings → Accessibility → Spoken Content. MLXRead never changes that setting for you.")
-                    .font(.caption)
+                Label(appState.hotkeyInstalled ? "Shortcut ready" : "Shortcut needs setup",
+                      systemImage: appState.hotkeyInstalled ? "checkmark.circle" : "exclamationmark.triangle")
+                Text("Select text in another app, then press Option–Escape to start reading. Press it again to stop.")
+                Text("If macOS Speak Selection uses the same shortcut, change it in System Settings → Accessibility → Spoken Content.")
                     .foregroundStyle(.secondary)
+                Button("Show Setup…", action: showSetup)
             }
 
-            Section {
-                Toggle("Launch at login", isOn: Binding(
+            Section("Everyday use") {
+                Toggle("Start MLXRead at login", isOn: Binding(
                     get: { appState.launchAtLoginEnabled },
                     set: { appState.setLaunchAtLogin($0) }
                 ))
-                Text("Keeps MLXRead always on — it starts with your Mac and waits in the menu bar, a keystroke away.")
-                    .font(.caption)
+                Text("Keep the reading shortcut available whenever you use your Mac.")
+                    .foregroundStyle(.secondary)
+                Toggle("Show playback controls while reading", isOn: $settings.showPlaybackHUD)
+                Text("A small floating panel shows progress and a Stop button.")
                     .foregroundStyle(.secondary)
             }
 
-            Section {
-                Toggle("Clipboard fallback for apps without Accessibility text", isOn: $settings.clipboardFallbackEnabled)
-                Toggle("Show floating playback controller", isOn: $settings.showPlaybackHUD)
-                Toggle("Show selection preview in this window (kept off by default)", isOn: $settings.showSelectionPreview)
-            }
-
-            Section {
-                LabeledContent("Maximum selection length") {
-                    TextField(
-                        "characters",
-                        value: $settings.maximumSelectionLength,
-                        format: .number
-                    )
-                    .frame(width: 100)
-                    .multilineTextAlignment(.trailing)
+            Section("Selection capture") {
+                Toggle("Use Copy when an app can’t share its selection", isOn: $settings.clipboardFallbackEnabled)
+                Text("MLXRead briefly copies the selection, then restores your clipboard if nothing else has changed it.")
+                    .foregroundStyle(.secondary)
+                LabeledContent("Selection limit") {
+                    HStack {
+                        TextField("Characters", value: $settings.maximumSelectionLength, format: .number)
+                            .labelsHidden()
+                            .textFieldStyle(.roundedBorder)
+                            .frame(width: 110)
+                            .multilineTextAlignment(.trailing)
+                            .accessibilityLabel("Maximum selection length in characters")
+                        Text("characters")
+                    }
                 }
-                Text("Longer selections are truncated at a word boundary and the truncation is reported in the menu.")
-                    .font(.caption)
+                Text("Between 500 and 100,000 characters. Longer selections stop at a word boundary; the menu tells you when text was shortened.")
                     .foregroundStyle(.secondary)
             }
 
@@ -60,24 +58,13 @@ struct GeneralSettingsView: View {
                         get: { updates.automaticallyChecksForUpdates },
                         set: { updates.automaticallyChecksForUpdates = $0 }
                     ))
-                    HStack {
-                        Button("Check Now") { updates.checkForUpdates() }
-                            .disabled(!updates.canCheckForUpdates)
-                        Spacer()
-                        Text("Updates are cryptographically signed (EdDSA) and verified before install.")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                    }
-                }
-            }
-
-            Section {
-                Button("Reset onboarding") {
-                    settings.onboardingCompleted = false
+                    Button("Check for Updates…") { updates.checkForUpdates() }
+                        .disabled(!updates.canCheckForUpdates)
+                    Text("Updates are signed and verified before installation.")
+                        .foregroundStyle(.secondary)
                 }
             }
         }
         .formStyle(.grouped)
-        .padding(.bottom, 8)
     }
 }
