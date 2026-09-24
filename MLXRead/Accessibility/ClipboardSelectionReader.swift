@@ -7,7 +7,7 @@ import Carbon.HIToolbox
 /// Sequence: snapshot pasteboard → synthesize ⌘C → wait (bounded) for a new
 /// pasteboard change → accept only fresh textual content → restore the
 /// snapshot when nothing else has touched the pasteboard since.
-final class ClipboardSelectionReader: Sendable {
+final class ClipboardSelectionReader: ClipboardTextReading, Sendable {
     /// How long to wait for the frontmost app to service ⌘C.
     private let copyTimeout: TimeInterval
     /// Poll interval for changeCount.
