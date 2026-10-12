@@ -40,6 +40,23 @@ async function removeStaleHashedFiles(pkgDir, outputName, extension) {
   }
 }
 
+// The JS filename must identify the final bytes, including the hashed WASM URL.
+export function fingerprintAssets(outputName, jsBuffer, wasmBuffer, cssBuffer) {
+  const wasmHash = shortHash(wasmBuffer);
+  const cssHash = shortHash(cssBuffer);
+  const hashedWasmName = hashedName(outputName, wasmHash, "wasm");
+  const source = new TextDecoder("utf-8", { fatal: true }).decode(jsBuffer);
+  const wasmUrl = /new URL\(\s*(["'])([^"']+\.wasm)\1\s*,\s*import\.meta\.url\s*\)/g;
+  if ([...source.matchAll(wasmUrl)].length !== 1) {
+    throw new Error("expected exactly one static WASM URL in generated glue");
+  }
+  const rewrittenJs = source.replace(wasmUrl, `new URL("${hashedWasmName}",import.meta.url)`);
+  const jsHash = shortHash(rewrittenJs);
+  return { jsHash, wasmHash, cssHash, rewrittenJs, hashedWasmName,
+    hashedJsName: hashedName(outputName, jsHash, "js"),
+    hashedCssName: hashedName(outputName, cssHash, "css") };
+}
+
 async function main() {
   const metadata = JSON.parse(
     runOrThrow("cargo", ["metadata", "--no-deps", "--format-version", "1"]),
@@ -81,18 +98,8 @@ async function main() {
   const wasmBuffer = await readFile(wasmPath);
   const cssBuffer = await readFile(cssPath);
 
-  const jsHash = shortHash(jsBuffer);
-  const wasmHash = shortHash(wasmBuffer);
-  const cssHash = shortHash(cssBuffer);
-
-  const hashedJsName = hashedName(outputName, jsHash, "js");
-  const hashedWasmName = hashedName(outputName, wasmHash, "wasm");
-  const hashedCssName = hashedName(outputName, cssHash, "css");
-
-  const rewrittenJs = new TextDecoder().decode(jsBuffer).replace(
-    /new URL\("([^"]+\.wasm)",import\.meta\.url\)/,
-    `new URL("${hashedWasmName}",import.meta.url)`,
-  );
+  const { jsHash, wasmHash, cssHash, hashedJsName, hashedWasmName,
+    hashedCssName, rewrittenJs } = fingerprintAssets(outputName, jsBuffer, wasmBuffer, cssBuffer);
 
   await writeFile(join(pkgDir, hashedJsName), rewrittenJs);
   await writeFile(join(pkgDir, hashedCssName), cssBuffer);
@@ -128,7 +135,7 @@ async function main() {
   );
 }
 
-main().catch((error) => {
+if (import.meta.main) main().catch((error) => {
   console.error(`[hash-assets] ${error.message}`);
   process.exit(1);
 });
