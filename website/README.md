@@ -82,18 +82,42 @@ The compatibility production endpoint is
 domain is `https://mlxread.com`; it is not considered released until DNS, TLS,
 routes, status codes, content, and response headers pass live readback.
 
-Pages deployment:
+Choose one target before planning:
 
-```bash
-bash ./scripts/build-pages.sh
-bunx wrangler@4.83.0 pages deploy dist-pages \
-  --project-name mlxread-web --branch main
-```
+- Pages: run `bash ./scripts/build-pages.sh`; artifact `dist-pages`, project
+  `mlxread-web`, production branch `main`.
+- Workers Assets: run `bash ./scripts/build-edge.sh`; configuration
+  `wrangler.toml`, generated entrypoint `build/_worker.js`, assets `target/site`.
 
-Workers deployment uses `wrangler.toml` and the `build/_worker.js` entrypoint.
-Cloudflare mutations must use the repository's purpose-scoped child token and
-the operator's governed deployment lane; the account minter never enters this
-repository or CI.
+The separate `../api` delivery Worker has its own release and bindings.
+Neither website target publishes it. Run `bash ./scripts/verify.sh` against the
+exact source before preparing a release; keep local proof and provider proof
+separate.
+
+Use `cfctl` on PATH for account reads and publication. Check `cfctl version
+--json`, `cfctl doctor --json`, and `cfctl auth status <profile> --json`. Bind an
+explicit available managed profile to the intended account, target and source
+commit; do not rely on a globally selected profile or duplicate token variables.
+
+Resolve the chosen Pages or Workers deployment with `cfctl resolve "<bounded
+intent>" --json`, inspect `cfctl catalog show <capability-id> --json`, and follow
+`cfctl guide <capability-id> --json`. Use the guide's exact artifact preparation,
+selectors and bounded read commands with `--profile <profile>` and
+`--account <account-id>`. A blocked capability is a blocker, not permission to
+publish with raw Wrangler or the dashboard.
+
+Create a plan through the guide's `cfctl call` command and inspect
+`cfctl plans show <operation-id> --json`. Check the exact artifact/source,
+account, target, routes, cost, permissions, previous deployment, verification and
+compensation. After approval of that exact plan, use `cfctl plans approve
+<operation-id> --yes`, `cfctl plans run <operation-id>` and
+`cfctl plans status <operation-id>`; add `--json` when consuming their output.
+
+Verify the actual deployment version and routes with the prescribed provider
+readback, then verify public DNS, TLS, statuses, content and headers. If readback
+fails, preserve the failed operation and plan compensation to the recorded prior
+version through cfctl. Do not rebuild and silently substitute a new artifact
+under the old approval.
 
 ## Design intent
 

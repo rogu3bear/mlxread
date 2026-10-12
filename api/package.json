@@ -5,9 +5,7 @@
   "description": "MLXRead delivery worker: contact form + in-app error reports -> email (Cloudflare Email Routing) + R2.",
   "type": "module",
   "scripts": {
-    "dev": "wrangler dev",
-    "deploy": "wrangler deploy",
-    "tail": "wrangler tail"
+    "dev": "wrangler dev"
   },
   "dependencies": {
     "mimetext": "^3.0.28"
