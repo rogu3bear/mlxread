@@ -4,7 +4,7 @@ import ApplicationServices
 /// Reads the selected text of the focused UI element via the Accessibility
 /// API. All AX calls run off the main actor; they can block for the
 /// messaging timeout when an app is unresponsive.
-final class AXSelectedTextReader: Sendable {
+final class AXSelectedTextReader: AXSelectionReading, Sendable {
     /// AX messaging timeout in seconds for our requests.
     private static let messagingTimeout: Float = 0.5
 
