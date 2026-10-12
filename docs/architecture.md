@@ -169,6 +169,7 @@ loads that local directory and never implicitly restores deleted weights.
 The engine cache keeps only the most recently used model and drops it when
 its download becomes unavailable. Voice choices survive model deletion.
 
-A future `KokoroSpeechEngine` or any other backend implements `SpeechEngine`
-and plugs into `AppState`'s engine provider; selection, hotkey, playback, and
-UI layers are untouched by backend changes.
+`NativeMLXSpeechEngine` implements `SpeechEngine` for all five supported models,
+including Kokoro. `AppState` supplies it through `EngineCache`; interaction
+proofs can select `MockSpeechEngine` with `MLXREAD_ENGINE=mock`. Selection,
+hotkey, playback, and UI layers consume the shared interface.

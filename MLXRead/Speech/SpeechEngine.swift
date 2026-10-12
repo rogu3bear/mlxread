@@ -3,8 +3,8 @@ import Foundation
 /// Backend-independent speech synthesis interface.
 ///
 /// Implementations: `NativeMLXSpeechEngine` (production), `MockSpeechEngine`
-/// (tests and interaction proofs). A future `KokoroSpeechEngine` or any other
-/// backend slots in here without touching selection, playback, hotkey, or UI.
+/// (tests and interaction proofs). The production engine supports all five
+/// models; selection, playback, hotkey, and UI consume this shared interface.
 protocol SpeechEngine: Sendable {
     var identifier: String { get }
     var displayName: String { get }

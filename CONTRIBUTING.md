@@ -67,14 +67,31 @@ Changes to these deserve extra review (see `mlxread-threat-model.md`):
 
 - Selected text stays in memory only, is never written to disk, and is never
   logged. See [docs/privacy.md](docs/privacy.md).
-- No analytics, no crash-reporting SDK, no network except explicit model
-  download and the signed update check.
+- No analytics or automatic crash-reporting SDK. Network use is limited to
+  model downloads, Kokoro's first-use pronunciation assets, configured signed
+  update checks, and user-submitted problem reports. The complete data-flow
+  description lives in [docs/privacy.md](docs/privacy.md).
 
 ## Tests
 
 Add unit tests for logic changes (`MLXReadTests/`). Integration tests that hit
 real models are opt-in (`script/test.sh --integration`). Run `script/test.sh`
 before opening a PR.
+
+Run `python3 script/check-file-limits.py` for the repository file-size inventory
+and `python3 -B script/test-file-limits.py` for its boundary tests. The local
+check covers tracked and non-ignored files plus applicable local instruction
+files: 2,000 physical lines for text and 799 for instructions, counting comments,
+blank lines, and an unterminated final line. Its output names generated files,
+approved exceptions, ignored areas, and any unresolved measurement. It runs
+only when invoked; no hook or CI job is installed.
+
+The repository maintainers own these bounded measurement exceptions, reviewed
+when the paths or their producers change: Cargo maintains `website/Cargo.lock`
+(measured but exempt from the line cap); PNGs in the app icon set and website
+assets have no text-line limit; credential files and ignored runtime/build
+outputs are listed without reading their contents. Other binary, unreadable,
+or unclassified ignored paths leave the check unresolved.
 
 Quit the running MLXRead app before starting Xcode tests: the app now prohibits
 duplicate launches. `script/build_and_run.sh` stops the running app before it

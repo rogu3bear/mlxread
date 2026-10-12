@@ -14,7 +14,9 @@ stops instantly.
   (delivery control), Pocket TTS, and Soprano 80M
 - Selection capture via the Accessibility API, with a clipboard-preserving
   ⌘C fallback for apps that don't expose their selection
-- No network after model download, no telemetry, no logging of your text
+- Offline synthesis after model and pronunciation assets are cached; no
+  telemetry or logging of your text. Configured update checks and user-started
+  problem reports use the network (see [privacy](docs/privacy.md)).
 
 ## Requirements
 
@@ -127,7 +129,8 @@ assets), synthesis requires no network. Verification procedure:
 
 Selected text never leaves the machine, is never written to disk, and never
 appears in logs (lengths and timings only — verifiable with
-`script/build_and_run.sh --logs`). No analytics, no crash reporting. Full
+`script/build_and_run.sh --logs`). No analytics or automatic crash reporting.
+Problem reports are sent only when you submit them. Full
 statement and enforcement points: [docs/privacy.md](docs/privacy.md).
 
 ## Tests and benchmarks
