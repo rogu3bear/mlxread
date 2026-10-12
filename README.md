@@ -115,8 +115,10 @@ MLXRead auto-updates via [Sparkle 2](https://sparkle-project.org) with
 **EdDSA-signed** appcasts over HTTPS — every update is cryptographically
 verified before install. Check manually from the menu bar (**Check for
 Updates…**) or Settings → General; automatic daily checks are on by default.
-Update controls only appear in a build configured with a real feed and public
-key; source/dev builds keep the updater inactive. Maintainer setup and the
+Update controls appear in builds configured with a real feed and public key.
+The checked-in project has the release feed and public key configured; clear
+the feed URL in a local development configuration to keep updates inactive.
+Maintainer setup and the
 release/signing process: [docs/updates.md](docs/updates.md).
 
 ## Offline behavior
@@ -153,9 +155,11 @@ stale or unsigned build can't be opened by accident.
 ### Notarizing a release (one command)
 
 `script/notarize.sh` builds (if needed), notarizes with Apple, staples the app,
-rebuilds and notarizes the DMG, and updates both GitHub release assets — a
-single command. People install from `MLXRead.dmg`; Sparkle continues to consume
-`MLXRead.zip` as its update archive.
+rebuilds and notarizes the DMG, and uploads the DMG, ZIP, and signed appcast — a
+single command. It requires an existing GitHub release whose tag matches the
+clean source HEAD and a packaged app bound to that revision. People install
+from `MLXRead.dmg`; Sparkle consumes `MLXRead.zip` through the generated
+`appcast.xml` release asset. See [docs/updates.md](docs/updates.md) for the gates.
 
 ```bash
 ./script/notarize.sh

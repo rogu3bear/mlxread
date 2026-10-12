@@ -20,19 +20,23 @@ DERIVED=build/DerivedData
 CONFIGURATION=Release
 APP="$DERIVED/Build/Products/$CONFIGURATION/MLXRead.app"
 
-SIGN_OVERRIDE=()
-[[ -n "${DEVELOPMENT_TEAM:-}" ]] && SIGN_OVERRIDE+=("DEVELOPMENT_TEAM=$DEVELOPMENT_TEAM")
-[[ -n "${CODE_SIGN_IDENTITY:-}" ]] && SIGN_OVERRIDE+=("CODE_SIGN_IDENTITY=$CODE_SIGN_IDENTITY")
-[[ -n "${CODE_SIGN_STYLE:-}" ]] && SIGN_OVERRIDE+=("CODE_SIGN_STYLE=$CODE_SIGN_STYLE")
-[[ -n "${OTHER_CODE_SIGN_FLAGS:-}" ]] && SIGN_OVERRIDE+=("OTHER_CODE_SIGN_FLAGS=$OTHER_CODE_SIGN_FLAGS")
+echo "==> Regenerating Xcode project from project.yml"
+xcodegen generate
+
+SOURCE_REVISION="$(git rev-parse HEAD)"
+BUILD_OVERRIDE=("MLXREAD_SOURCE_REVISION=$SOURCE_REVISION")
+[[ -n "${DEVELOPMENT_TEAM:-}" ]] && BUILD_OVERRIDE+=("DEVELOPMENT_TEAM=$DEVELOPMENT_TEAM")
+[[ -n "${CODE_SIGN_IDENTITY:-}" ]] && BUILD_OVERRIDE+=("CODE_SIGN_IDENTITY=$CODE_SIGN_IDENTITY")
+[[ -n "${CODE_SIGN_STYLE:-}" ]] && BUILD_OVERRIDE+=("CODE_SIGN_STYLE=$CODE_SIGN_STYLE")
+[[ -n "${OTHER_CODE_SIGN_FLAGS:-}" ]] && BUILD_OVERRIDE+=("OTHER_CODE_SIGN_FLAGS=$OTHER_CODE_SIGN_FLAGS")
 # A Developer ID build takes no provisioning profile; allow explicitly clearing.
 if [[ -n "${CLEAR_PROVISIONING:-}" ]]; then
-  SIGN_OVERRIDE+=("PROVISIONING_PROFILE_SPECIFIER=")
+  BUILD_OVERRIDE+=("PROVISIONING_PROFILE_SPECIFIER=")
 fi
 # For distribution, suppress the injected base entitlements (get-task-allow),
 # which a plain `xcodebuild build` otherwise adds even in Release. Absent
 # get-task-allow is required to notarize and closes TM-001.
-[[ -n "${INJECT_BASE_ENTITLEMENTS:-}" ]] && SIGN_OVERRIDE+=("CODE_SIGN_INJECT_BASE_ENTITLEMENTS=$INJECT_BASE_ENTITLEMENTS")
+[[ -n "${INJECT_BASE_ENTITLEMENTS:-}" ]] && BUILD_OVERRIDE+=("CODE_SIGN_INJECT_BASE_ENTITLEMENTS=$INJECT_BASE_ENTITLEMENTS")
 
 echo "==> Building ($CONFIGURATION)"
 # Remove any stale product first (a prior hosted-test build can leave an
@@ -45,7 +49,7 @@ xcodebuild \
   -derivedDataPath "$DERIVED" \
   -skipPackagePluginValidation \
   -skipMacroValidation \
-  ${SIGN_OVERRIDE[@]+"${SIGN_OVERRIDE[@]}"} \
+  "${BUILD_OVERRIDE[@]}" \
   build
 
 mkdir -p dist

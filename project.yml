@@ -13,8 +13,9 @@ options:
 
 settings:
   base:
-    MARKETING_VERSION: 0.1.0
-    CURRENT_PROJECT_VERSION: 1
+    MARKETING_VERSION: 0.1.1
+    CURRENT_PROJECT_VERSION: 2
+    MLXREAD_SOURCE_REVISION: development
     SWIFT_VERSION: "5.0"
     SWIFT_STRICT_CONCURRENCY: complete
     DEVELOPMENT_TEAM: NB3G4L6ZD4
@@ -65,16 +66,16 @@ targets:
         # real release version instead of xcodegen's 1.0/1 default.
         CFBundleShortVersionString: "$(MARKETING_VERSION)"
         CFBundleVersion: "$(CURRENT_PROJECT_VERSION)"
+        MLXReadSourceRevision: "$(MLXREAD_SOURCE_REVISION)"
         LSUIElement: true
         LSMultipleInstancesProhibited: true
         LSMinimumSystemVersion: "14.0"
         LSApplicationCategoryType: public.app-category.utilities
         NSHumanReadableCopyright: "© 2026 James Auchterlonie. MIT licensed."
-        # Sparkle auto-update. SUFeedURL and SUPublicEDKey are the only two
-        # release-specific values; set them for a published build (see
-        # docs/updates.md). An empty SUFeedURL disables update UI at runtime.
-        SUFeedURL: "https://raw.githubusercontent.com/OWNER/mlxread/main/appcast.xml"
-        SUPublicEDKey: "REPLACE_WITH_generate_keys_PUBLIC_KEY"
+        # Sparkle reads the signed appcast uploaded with the latest GitHub
+        # release. The matching private key remains in the maintainer Keychain.
+        SUFeedURL: "https://github.com/rogu3bear/mlxread/releases/latest/download/appcast.xml"
+        SUPublicEDKey: "4sdsVR9NrsC/uI89PMsL46/H3ixbfP7NZOWLMsRY0EY="
         SUEnableAutomaticChecks: true
         SUScheduledCheckInterval: 86400
     settings:

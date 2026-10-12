@@ -16,15 +16,21 @@ cd "$(dirname "$0")/.."
 PROFILE="${NOTARY_PROFILE:-mlxread-notary}"
 TEAM_ID="${NOTARY_TEAM_ID:-4JB58L7BTZ}"
 IDENTITY="Developer ID Application: MLNavigator Inc. (${TEAM_ID})"
+SPARKLE_ACCOUNT="${SPARKLE_ACCOUNT:-mlxread}"
+REPO_SLUG="${RELEASE_REPO:-rogu3bear/mlxread}"
 APP="dist/MLXRead.app"
 ZIP="dist/MLXRead.zip"
 DMG="dist/MLXRead.dmg"
-TAG="${RELEASE_TAG:-v0.1.0}"
+APPCAST="dist/appcast.xml"
+VERSION="$(awk '$1 == "MARKETING_VERSION:" { print $2; exit }' project.yml)"
+BUILD_VERSION="$(awk '$1 == "CURRENT_PROJECT_VERSION:" { print $2; exit }' project.yml)"
+TAG="${RELEASE_TAG:-v$VERSION}"
+RELEASE_CONTRACT="script/release-contract.sh"
 
 # Publication is part of this command's contract. Fail before expensive build
 # and notarization work if the destination cannot be reached.
 command -v gh >/dev/null 2>&1 || { echo "error: gh is required to publish release assets" >&2; exit 1; }
-gh release view "$TAG" >/dev/null 2>&1 || { echo "error: GitHub release $TAG does not exist or is inaccessible" >&2; exit 1; }
+gh release view "$TAG" --repo "$REPO_SLUG" >/dev/null 2>&1 || { echo "error: GitHub release $REPO_SLUG/$TAG does not exist or is inaccessible" >&2; exit 1; }
 
 # 1) Build the Developer ID app if it's missing (or --rebuild).
 if [[ "${1:-}" == "--rebuild" || ! -d "$APP" ]]; then
@@ -39,6 +45,12 @@ if [[ "${1:-}" == "--rebuild" || ! -d "$APP" ]]; then
 fi
 
 [[ -f "$ZIP" ]] || { echo "error: $ZIP not found; run with --rebuild" >&2; exit 1; }
+
+# A release asset must identify the exact tagged source that produced it and
+# must carry a usable update configuration. Untracked operator files are
+# intentionally ignored because they are outside the XcodeGen source graph.
+bash "$RELEASE_CONTRACT" verify \
+  --repo "$PWD" --app "$APP" --tag "$TAG" --repo-slug "$REPO_SLUG"
 
 # 2) One-time credential setup (interactive, stored in Keychain).
 if ! xcrun notarytool history --keychain-profile "$PROFILE" >/dev/null 2>&1; then
@@ -87,6 +99,26 @@ rm -f "$ZIP"
 ditto -c -k --keepParent "$APP" "$ZIP"
 bash script/create-dmg.sh "$APP" "$DMG"
 
+# Generate the signed feed from the exact final ZIP. Hosting it as a release
+# asset avoids a source/appcast/tag cycle while keeping the app's feed URL
+# stable through GitHub's latest-release redirect.
+APPCAST_DIR="$(mktemp -d "${TMPDIR:-/tmp}/mlxread-appcast.XXXXXX")"
+trap 'rm -rf "$APPCAST_DIR"' EXIT
+cp "$ZIP" "$APPCAST_DIR/MLXRead.zip"
+SPARKLE_BIN="$(find build/DerivedData/SourcePackages/artifacts -path '*Sparkle/bin/generate_appcast' -type f -perm -111 | head -1)"
+[[ -x "$SPARKLE_BIN" ]] || { echo "error: Sparkle generate_appcast tool not found" >&2; exit 1; }
+rm -f "$APPCAST"
+"$SPARKLE_BIN" \
+  --account "$SPARKLE_ACCOUNT" \
+  --download-url-prefix "https://github.com/$REPO_SLUG/releases/download/$TAG/" \
+  --link "https://mlxread.com" \
+  --maximum-deltas 0 \
+  -o "$APPCAST" \
+  "$APPCAST_DIR"
+bash "$RELEASE_CONTRACT" verify-appcast \
+  --appcast "$APPCAST" --tag "$TAG" --version "$VERSION" \
+  --build "$BUILD_VERSION" --repo-slug "$REPO_SLUG"
+
 # 5) Sign, verify, notarize, and staple the container a person actually downloads.
 echo "==> Signing installer image"
 codesign --force --timestamp --sign "$IDENTITY" "$DMG"
@@ -99,9 +131,12 @@ xcrun stapler validate "$DMG"
 echo "==> Gatekeeper assessment"
 spctl -a -vvv "$APP"
 
-# 7) Publish both contracts: DMG for people, ZIP for Sparkle updates.
+# 7) Recheck the final app identity, then publish all three contracts: DMG for
+# people, ZIP for Sparkle, and the signed appcast that binds them.
+bash "$RELEASE_CONTRACT" verify \
+  --repo "$PWD" --app "$APP" --tag "$TAG" --repo-slug "$REPO_SLUG"
 echo "==> Updating GitHub release $TAG assets"
-gh release upload "$TAG" "$DMG" "$ZIP" --clobber
+gh release upload "$TAG" "$DMG" "$ZIP" "$APPCAST" --repo "$REPO_SLUG" --clobber
 
 echo
-echo "==> Done: notarized, stapled, and published DMG + Sparkle ZIP."
+echo "==> Done: notarized, stapled, and published DMG + signed Sparkle feed."

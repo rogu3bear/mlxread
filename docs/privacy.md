@@ -32,7 +32,8 @@ The app can make these outbound requests:
 2. Kokoro pronunciation/G2P asset downloads on first synthesis, cached for
    later offline use.
 3. Sparkle update checks only in a release whose HTTPS feed and public key are
-   fully configured. Placeholder source builds keep the updater inactive.
+   fully configured. The checked-in project contains the release configuration;
+   clearing the feed URL in a local development configuration keeps updates inactive.
 4. A user-started in-app problem report containing an optional email and
    description plus a diagnostic ZIP. The app never inserts selected or spoken
    text into these fields or the bundle.

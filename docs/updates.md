@@ -13,20 +13,24 @@ the maintainer's Ed25519 **private** key. This is the mitigation for threat
 - **Menu bar → Check for Updates…** and **Settings → General → Updates**
   (auto-check toggle + "Check Now") appear **only when the build is
   configured** for updates (real feed URL + public key).
-- Source checkouts and development builds keep the template placeholders, so
-  the updater stays **inactive** and the update UI is hidden — no accidental
-  checks against a placeholder feed. See
+- `project.yml` contains the release feed and public key, so a build from the
+  checked-in configuration has updates enabled. Clear `SUFeedURL` in a local
+  development configuration and regenerate the project to keep the updater
+  **inactive** and hide update controls. See
   `MLXRead/Updates/UpdateService.swift` (`looksConfigured`).
 - Automatic background checks default on (`SUEnableAutomaticChecks`), daily
   (`SUScheduledCheckInterval = 86400`).
 
 ## One-time maintainer setup
 
-The signing key is a **credential the maintainer owns** — generate it
-yourself; it is never created by CI or committed.
+The private signing key is a **credential the maintainer owns**. The project
+contains its public key; signing a release requires the matching private key
+in the maintainer's Keychain. It is never created by CI or committed. Preserve
+the existing signing identity for installed clients; do not generate a new
+key merely to make a release command pass.
 
-1. **Generate the Ed25519 key pair** (private key saved to your login
-   Keychain, public key printed):
+1. For an initial installation only, **generate an Ed25519 key pair** (private
+   key saved to your login Keychain, public key printed):
 
    ```bash
    # The tool ships inside the resolved Sparkle package:
@@ -40,11 +44,11 @@ yourself; it is never created by CI or committed.
    then `xcodegen generate`:
 
    ```yaml
-   SUFeedURL: "https://raw.githubusercontent.com/<owner>/mlxread/main/appcast.xml"
+   SUFeedURL: "https://github.com/rogu3bear/mlxread/releases/latest/download/appcast.xml"
    SUPublicEDKey: "<public key from step 1>"
    ```
 
-   (Or host the appcast on GitHub Pages / any HTTPS location you control.)
+   The release contract requires this stable GitHub release-asset URL.
 
 3. **Back up the private key** off-machine:
 
@@ -58,36 +62,37 @@ a release signing identity.
 
 ## Cutting a release
 
-1. Build and sign a **Developer ID + hardened-runtime + notarized** app
-   (see `docs/system-voice-provider.md` and `script/package.sh`; for a public
-   release, sign with Developer ID rather than the local Development identity).
-2. Zip the `.app`:
+1. Set `MARKETING_VERSION` and `CURRENT_PROJECT_VERSION` in `project.yml`, run
+   `xcodegen generate`, and commit the source and generated configuration.
+   Sparkle compares `CFBundleVersion`; increase it for the next release.
+2. When separately authorized to publish a release, create its `v<version>`
+   tag at that exact clean source commit and create the matching GitHub release.
+   PR integration alone does not authorize these publication effects.
+3. Run `script/notarize.sh --rebuild` with the maintainer's Developer ID and
+   notarization credentials. Packaging regenerates the Xcode project and embeds
+   the current source revision in `MLXReadSourceRevision`. The release contract
+   rejects tracked dirt, a tag that differs from HEAD, mismatched app version or
+   revision, and an unusable feed/key before notarization.
+4. The script notarizes and staples the app, rebuilds the final `MLXRead.zip`
+   and `MLXRead.dmg`, and generates `dist/appcast.xml` from that exact ZIP using
+   Sparkle's `generate_appcast` and the Keychain account `mlxread` (override
+   with `SPARKLE_ACCOUNT`). It checks the feed's version, build, archive URL,
+   nonzero length, and signature encoding before upload.
+5. After DMG notarization and Gatekeeper checks, the script uploads the DMG,
+   ZIP, and signed appcast to the selected release. `RELEASE_REPO` selects the
+   repository and `RELEASE_TAG` must still match the project's version. The
+   stable feed URL follows GitHub's latest release; verify that release points
+   to the intended assets before claiming update delivery.
 
-   ```bash
-   ditto -c -k --keepParent dist/MLXRead.app "MLXRead-<version>.zip"
-   ```
-
-3. **Sign + build the appcast** (auto-signs from the Keychain private key):
-
-   ```bash
-   DIR="$(dirname "$BIN")"
-   "$DIR/generate_appcast" /path/to/folder-containing-the-zip/
-   ```
-
-   This writes/updates `appcast.xml` with the correct `sparkle:edSignature`,
-   `length`, and version fields. (To sign a single archive by hand:
-   `"$DIR/sign_update" MLXRead-<version>.zip`.)
-
-4. Upload the `.zip` to the GitHub Release matching the `enclosure` URL, and
-   publish the updated `appcast.xml` at `SUFeedURL`.
-
-5. Bump `MARKETING_VERSION` (CFBundleShortVersionString) and
-   `CURRENT_PROJECT_VERSION` (CFBundleVersion) in `project.yml` for the next
-   build — Sparkle compares `CFBundleVersion`.
+`script/test-release-contract.sh` exercises the local identity and appcast
+validation with fixtures. It does not establish signing-key ownership,
+cryptographic signature validity, notarization, upload, or a client update.
 
 ## Files
 
-- `appcast.xml` — the feed template at the repo root (replace `OWNER`).
+- `dist/appcast.xml` — generated signed feed, uploaded as a release asset;
+  it is not committed in the source tree.
+- `script/release-contract.sh` — source/artifact identity and appcast checks.
 - `MLXRead/Updates/UpdateService.swift` — the in-app integration.
 - Info.plist keys `SUFeedURL` / `SUPublicEDKey` / `SUEnableAutomaticChecks` /
   `SUScheduledCheckInterval` — declared in `project.yml`.

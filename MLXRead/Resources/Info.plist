@@ -24,18 +24,20 @@
 	<string>public.app-category.utilities</string>
 	<key>LSMinimumSystemVersion</key>
 	<string>14.0</string>
-	<key>LSUIElement</key>
-	<true/>
 	<key>LSMultipleInstancesProhibited</key>
 	<true/>
+	<key>LSUIElement</key>
+	<true/>
+	<key>MLXReadSourceRevision</key>
+	<string>$(MLXREAD_SOURCE_REVISION)</string>
 	<key>NSHumanReadableCopyright</key>
 	<string>© 2026 James Auchterlonie. MIT licensed.</string>
 	<key>SUEnableAutomaticChecks</key>
 	<true/>
 	<key>SUFeedURL</key>
-	<string>https://raw.githubusercontent.com/OWNER/mlxread/main/appcast.xml</string>
+	<string>https://github.com/rogu3bear/mlxread/releases/latest/download/appcast.xml</string>
 	<key>SUPublicEDKey</key>
-	<string>REPLACE_WITH_generate_keys_PUBLIC_KEY</string>
+	<string>4sdsVR9NrsC/uI89PMsL46/H3ixbfP7NZOWLMsRY0EY=</string>
 	<key>SUScheduledCheckInterval</key>
 	<integer>86400</integer>
 </dict>
