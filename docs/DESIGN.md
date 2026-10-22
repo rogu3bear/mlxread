@@ -52,7 +52,9 @@ behavior. The study uses a representative voice catalog and focused menu excerpt
 - **Models → Use & Preview:** select the other model, then preview its sample.
   The label exposes the existing selecting effect. The selected model can keep
   **Preview**; **Use Model** selects without playing. Retain each model's saved
-  voice and the existing language/configuration rules.
+  voice and language. Models uses a fixed sample independently of the Voice
+  editor; it still checks the saved voice/language and current assets before
+  playback. An unavailable configuration has an explicit Choose Voice route.
 
 ### Discovery and recovery
 
@@ -86,7 +88,7 @@ not establish that a reader will notice or understand it.
 | Missing model | Show Download and its approximate size; keep the saved voice visible. Explain that the first preview can fetch pronunciation assets. |
 | Failed acquisition | Keep the failure and Retry Download beside the affected model. Preserve choices and the edited sample. Details wrap/disclose without hiding recovery. |
 | Downloading/cancelling/checking | Show the current operation; offer Cancel only while supported. Wait for the writer to stop or validation to finish before claiming readiness. |
-| Assets validated | Show Ready to preview and eligible actions. Do not start speech or replay a selection automatically. |
+| Assets validated | Show Model files ready and eligible actions. Do not start speech or replay a selection automatically. |
 | Preparing/speaking | Show the active operation, its captured pace, and Stop. Changes to future pace do not relabel the active session. |
 | Missing or incompatible voice | Explain the restriction in text. Keep a valid alternative preview available; select only on Use. |
 | Permission/shortcut recovery | Show Granted/Not granted separately from Active/Starting/Unavailable. A permission request does not itself establish a grant. |
@@ -118,11 +120,17 @@ Its findings remain traceable; this design is not an independent re-review.
 | F-04 / P2: M4 has no repeatable usability protocol | The [prototype plan](DESIGN-SPRINT-PROTOTYPE-PLAN.md#repeatable-task-protocol) proposes fixed S1 conditions, first-exposure recruitment, tasks, assistance/timeout rules, and a separate native M4 transfer. | Review and freeze the protocol before use. Target, roster, participants, and trial remain unconfirmed; simulated audio cannot satisfy native M4. |
 | F-05 / P2: Stale-ready transition is missing | AC-15 adds both permission and asset changes before action; study shows the asset case. | Verify real runtime guards; a simulated transition is not proof. |
 
-HTML checks on 2026-10-22: 15 interaction assertions and 8 layout/focus assertions
+HTML checks on 2026-10-22: 23 interaction assertions and 8 layout/focus assertions
 passed; all 12 fixture layouts had no horizontal control overflow. Inspected
 Voice in light/dark appearance, failed download, the shortcut menu, and a narrow
 360 px review pane. Settings content measured 600 × 680 CSS px; setup measured
 560 × 460. The narrow pane scrolls the desktop study horizontally.
+The later candidate review found Models-preview prerequisite bypass and language
+reset defects in the study. The corrected study checks the saved configuration
+and stale assets, retains per-model languages, and focuses the missing-voice
+recovery control. Added checks cover both reproductions, alternative audition,
+model switching, incompatible language, and Models' independent fixed sample;
+the affected Models layouts were inspected again.
 The shared browser snapshot timed out twice; the HTML preview renderer supplied
 the inspected images and DOM checks. No native build, launch, audio, permission
 change, asset download, or user study was performed for this proposal.

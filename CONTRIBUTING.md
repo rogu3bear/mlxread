@@ -90,7 +90,10 @@ The repository maintainers own these bounded measurement exceptions, reviewed
 when the paths or their producers change: Cargo maintains `website/Cargo.lock`
 (measured but exempt from the line cap); PNGs in the app icon set and website
 assets have no text-line limit; credential files and ignored runtime/build
-outputs are listed without reading their contents. Other binary, unreadable,
+outputs are listed without reading their contents. Finder's `.DS_Store` metadata
+is classified as binary only when its eight-byte Desktop Services Store signature
+matches; its records are not read. This applies to ignored metadata too. A wrong
+signature, unreadable file, or symlink remains unresolved. Other binary, unreadable,
 or unclassified ignored paths leave the check unresolved.
 
 Quit the running MLXRead app before starting Xcode tests: the app now prohibits

@@ -6,6 +6,7 @@ from pathlib import Path
 import subprocess
 import tempfile
 import unittest
+from unittest.mock import mock_open, patch
 
 
 spec = importlib.util.spec_from_file_location("file_limits", Path(__file__).with_name("check-file-limits.py"))
@@ -60,6 +61,33 @@ class FileLimitTests(unittest.TestCase):
         for name in (".env", "website/.env.local", ".dev.vars", "key.pem"):
             self.assertEqual(limits.classify(self.root, Path(name))[0], "PRIVATE")
         self.assertEqual(self.write("website/.env.example", b"TOKEN=\n")[0], "TEXT")
+
+    def test_finder_metadata_requires_exact_name_and_signature(self):
+        signature = b"\x00\x00\x00\x01Bud1"
+        self.assertEqual(self.write(".DS_Store", signature + b"\0records")[0], "BINARY")
+        self.assertEqual(self.write("nested/.DS_Store", signature)[0], "BINARY")
+        for data in (b"", signature[:7], b"\x00\x00\x00\x02Bud1", b"authored text\n"):
+            self.assertEqual(self.write(".DS_Store", data)[0], "UNRESOLVED")
+        self.assertEqual(self.write("source.dat", signature)[0], "UNRESOLVED")
+
+    def test_finder_metadata_reads_only_the_signature(self):
+        self.write(".DS_Store", b"\x00\x00\x00\x01Bud1")
+        opener = mock_open(read_data=b"\x00\x00\x00\x01Bud1private records")
+        with patch.object(Path, "open", opener):
+            self.assertEqual(limits.classify(self.root, Path(".DS_Store"))[0], "BINARY")
+        opener().read.assert_called_once_with(8)
+
+    def test_ignored_finder_metadata_is_classified_without_following_symlinks(self):
+        subprocess.run(["git", "init", "-q", str(self.root)], check=True)
+        self.write(".gitignore", b".DS_Store\n")
+        self.write(".DS_Store", b"\x00\x00\x00\x01Bud1")
+        self.write("invalid/.DS_Store", b"not a metadata store")
+        (self.root / "linked").mkdir()
+        (self.root / "linked/.DS_Store").symlink_to(self.root / ".DS_Store")
+        rows = {str(path): status for path, status, _, _ in limits.inventory(self.root)}
+        self.assertEqual(rows[".DS_Store"], "BINARY")
+        self.assertEqual(rows["invalid/.DS_Store"], "UNRESOLVED")
+        self.assertEqual(rows["linked/.DS_Store"], "UNRESOLVED")
 
     def test_symlink_is_not_followed_and_deleted_file_is_reported(self):
         (self.root / "link").symlink_to("missing")

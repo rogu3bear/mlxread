@@ -58,6 +58,15 @@ def classify(root, path):
         return "UNRESOLVED", None, "symlink target not followed"
     if not full.exists():
         return "MISSING", None, "tracked deletion; no working file to measure"
+    if path.name == ".DS_Store":
+        try:
+            with full.open("rb") as handle:
+                signature = handle.read(8)
+        except OSError as error:
+            return "UNRESOLVED", None, str(error)
+        if signature == b"\x00\x00\x00\x01Bud1":
+            return "BINARY", None, "Finder metadata; eight-byte signature checked, records not read"
+        return "UNRESOLVED", None, "unrecognized Finder metadata signature"
     try:
         data = full.read_bytes()
         text = data.decode("utf-8")
@@ -98,6 +107,9 @@ def inventory(root):
     rows = [(path, *classify(root, path)) for path in sorted(paths)]
     ignored = git_paths(root, "--others", "--ignored", "--exclude-standard", "--directory")
     for path in sorted(ignored - paths):
+        if path.name == ".DS_Store":
+            rows.append((path, *classify(root, path)))
+            continue
         reason = "ignored runtime/build output; content not read"
         resolved = private_path(path) or any(part in RUNTIME_DIRS for part in path.parts)
         if private_path(path):

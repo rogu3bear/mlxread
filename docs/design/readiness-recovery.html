@@ -466,6 +466,7 @@ function baseState() {
   return {
     model: 'kokoro',
     savedVoices: {kokoro: 'af_heart', pocket: 'alba', qwen: 'ryan', chatterbox: 'default', soprano: 'default'},
+    savedLanguages: {kokoro: 'en-US', pocket: 'en-US', qwen: 'en-US', chatterbox: 'en-US', soprano: 'en-US'},
     assets: {chatterbox: 'missing', kokoro: 'ready', qwen: 'missing', pocket: 'ready', soprano: 'missing'},
     permission: true,
     shortcut: 'active',
@@ -559,9 +560,13 @@ function assetStatus(model = state.model) {
   return state.assets[model];
 }
 
+function voiceUsable(model, id, language) {
+  const voice = voiceCatalog[model].find(item => item.id === id);
+  return Boolean(voice && id !== state.missingVoice && (!voice.chineseOnly || language === 'zh'));
+}
+
 function selectedVoiceUsable() {
-  if (selectedVoice() === state.missingVoice) return false;
-  return !(state.model === 'qwen' && selectedVoice() === 'dylan' && state.language !== 'zh');
+  return voiceUsable(state.model, selectedVoice(), state.language);
 }
 
 function selectionBlocker() {
@@ -610,7 +615,7 @@ function banner() {
 function assetBody(model) {
   const info = models[model];
   const status = assetStatus(model);
-  if (status === 'ready') return '<p class="model-status">Ready to preview</p>';
+  if (status === 'ready') return '<p class="model-status">Model files ready</p>';
   if (status === 'downloading') {
     return '<p class="model-status num">Downloading · 42%</p><div class="progress-track"><span></span></div>' +
       '<div class="model-actions">' + button('Cancel', 'cancel-download', {value: model, id: 'cancel-' + model}) + '</div>';
@@ -684,10 +689,12 @@ function voiceScreen() {
 }
 
 function modelScreen() {
-  return '<header class="screen-heading"><h1>Models</h1><p>Download a model, then choose how to listen.</p></header>' +
+  return '<header class="screen-heading"><h1>Models</h1><p>Download a model, then try its fixed sample.</p></header>' +
     Object.entries(models).map(([id, info]) => {
       const current = id === state.model;
       const ready = assetStatus(id) === 'ready';
+      const language = current ? state.language : state.savedLanguages[id];
+      const usable = voiceUsable(id, state.savedVoices[id], language);
       return [
         '<section class="group model-card" id="model-card-' + id + '">',
         '<div class="model-title"><h2>' + escapeHtml(info.name) + '</h2>' + (current ? '<span class="secondary small">Selected</span>' : '') + '</div>',
@@ -696,9 +703,12 @@ function modelScreen() {
         ready ? '<div class="model-actions">' +
           button(current && busy() ? 'Stop' : current ? 'Preview' : 'Use &amp; Preview',
             current && busy() ? 'stop' : 'model-preview',
-            {value: id, id: 'model-preview-' + id, primary: !current, disabled: busy() && !current}) +
+            {value: id, id: 'model-preview-' + id, primary: !current, disabled: busy() ? !current : !usable}) +
           (!current ? button('Use Model', 'use-model', {value: id, id: 'use-model-' + id, disabled: busy()}) : '') +
           '</div>' + (!current ? '<p class="small secondary" style="margin-top:7px">Use &amp; Preview selects this model for future readings.</p>' : '') : '',
+        ready && !usable ? '<p class="small secondary">The saved voice is unavailable for this model or reading language. Choose a compatible voice in Voice settings.</p>' +
+          button(current ? 'Choose Voice…' : 'Use Model &amp; Choose Voice…', 'choose-model-voice',
+            {value: id, id: 'choose-model-voice-' + id, disabled: busy()}) : '',
         '<details><summary>Model details</summary><p>Approximate download: ' + info.size + '. Model and voice settings remain on this Mac.</p></details>',
         '</section>'
       ].join('');
@@ -861,17 +871,19 @@ function openView(view) {
   state.setupOpen = false;
   state.menuOpen = false;
   const focus = view === 'permissions' ? (state.permission && state.shortcut === 'retry' ? 'permission-retry' : 'grant-access') :
-    view === 'models' ? (assetStatus() === 'ready' ? 'model-preview-' + state.model : 'download-' + state.model) :
+    view === 'models' ? (assetStatus() === 'ready' ?
+      (selectedVoiceUsable() ? 'model-preview-' : 'choose-model-voice-') + state.model : 'download-' + state.model) :
     assetStatus() === 'ready' ? 'voice-search' : 'download-' + state.model;
   render(focus);
   note('Proposed destination: ' + view + '. Focus moves to the relevant existing control. No speech starts on navigation.');
 }
 
 function setModel(id) {
-  if (busy()) return;
+  if (busy() || id === state.model) return;
+  state.savedLanguages[state.model] = state.language;
   state.model = id;
   state.query = '';
-  state.language = 'en-US';
+  state.language = state.savedLanguages[id];
   state.error = '';
 }
 
@@ -888,7 +900,9 @@ function guardRequest() {
 }
 
 function startPreview(id) {
-  if (busy() || !state.sample.trim() || assetStatus() !== 'ready' || id === state.missingVoice) return;
+  const voice = voiceCatalog[state.model].find(item => item.id === id);
+  const language = voice && voice.chineseOnly ? 'zh' : state.language;
+  if (busy() || !state.sample.trim() || assetStatus() !== 'ready' || !voiceUsable(state.model, id, language)) return;
   if (!guardRequest()) return;
   state.previewVoice = id;
   state.phase = 'preparing';
@@ -978,8 +992,19 @@ function dispatch(action, value) {
     setModel(value);
     note(models[value].short + ' selected for future readings. No sample played.');
   }
+  if (action === 'choose-model-voice' && !busy()) {
+    setModel(value);
+    openView('voice');
+    return;
+  }
   if (action === 'model-preview' && !busy() && state.assets[value] === 'ready') {
     setModel(value);
+    if (!guardRequest()) return;
+    if (!selectedVoiceUsable()) {
+      note('The saved voice is unavailable for this model or language. Choose a compatible voice before previewing this model.');
+      render('choose-model-voice-' + value);
+      return;
+    }
     state.previewVoice = selectedVoice();
     state.phase = 'preparing';
     state.activeSpeed = state.speed;
@@ -1065,6 +1090,35 @@ function runPrototypeChecks() {
   setCase('models');
   dispatch('model-preview', 'pocket');
   checks.push(state.model === 'pocket' && selectedVoice() === 'alba' && busy() && state.savedVoices.kokoro === 'af_heart');
+  setCase('voice');
+  dispatch('open-view', 'models');
+  checks.push($('model-preview-kokoro').disabled && document.activeElement.id === 'choose-model-voice-kokoro');
+  dispatch('model-preview', 'kokoro');
+  checks.push(!busy() && state.previewVoice === null && selectedVoice() === 'af_heart');
+  dispatch('choose-model-voice', 'kokoro');
+  dispatch('preview', 'af_bella');
+  checks.push(busy() && selectedVoice() === 'af_heart');
+  setCase('stale');
+  dispatch('open-view', 'models');
+  dispatch('model-preview', 'kokoro');
+  checks.push(!busy() && assetStatus() === 'missing' && !state.pendingRemoval && Boolean(state.error));
+  setCase('language');
+  state.language = 'zh';
+  dispatch('use-voice', 'dylan');
+  dispatch('open-view', 'models');
+  dispatch('model-preview', 'qwen');
+  checks.push(busy() && state.language === 'zh' && selectedVoice() === 'dylan');
+  dispatch('stop');
+  dispatch('use-model', 'pocket');
+  dispatch('use-model', 'qwen');
+  checks.push(state.language === 'zh' && selectedVoice() === 'dylan' && !busy());
+  state.language = 'en-US';
+  dispatch('model-preview', 'qwen');
+  checks.push(!busy() && $('model-preview-qwen').disabled && state.language === 'en-US');
+  setCase('empty');
+  dispatch('open-view', 'models');
+  dispatch('model-preview', 'pocket');
+  checks.push(busy() && state.sample === '' && state.model === 'pocket');
   setCase('shortcut');
   advanceEnvironment();
   checks.push(!state.windowOpen && !state.menuOpen && !busy());
