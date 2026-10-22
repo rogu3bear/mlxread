@@ -60,7 +60,7 @@ def classify(root, path):
         return "MISSING", None, "tracked deletion; no working file to measure"
     if path.name == ".DS_Store":
         try:
-            with full.open("rb") as handle:
+            with full.open("rb", buffering=0) as handle:
                 signature = handle.read(8)
         except OSError as error:
             return "UNRESOLVED", None, str(error)

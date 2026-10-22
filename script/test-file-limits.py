@@ -2,11 +2,13 @@
 """Boundary and population tests for the local file-limit inventory."""
 
 import importlib.util
+from contextlib import contextmanager
+import os
 from pathlib import Path
 import subprocess
 import tempfile
 import unittest
-from unittest.mock import mock_open, patch
+from unittest.mock import patch
 
 
 spec = importlib.util.spec_from_file_location("file_limits", Path(__file__).with_name("check-file-limits.py"))
@@ -71,11 +73,19 @@ class FileLimitTests(unittest.TestCase):
         self.assertEqual(self.write("source.dat", signature)[0], "UNRESOLVED")
 
     def test_finder_metadata_reads_only_the_signature(self):
-        self.write(".DS_Store", b"\x00\x00\x00\x01Bud1")
-        opener = mock_open(read_data=b"\x00\x00\x00\x01Bud1private records")
-        with patch.object(Path, "open", opener):
+        (self.root / ".DS_Store").write_bytes(b"\x00\x00\x00\x01Bud1" + b"synthetic record\n" * 4096)
+        original_open = Path.open
+        raw_positions = []
+
+        @contextmanager
+        def track_open(path, *args, **kwargs):
+            with original_open(path, *args, **kwargs) as handle:
+                yield handle
+                raw_positions.append(os.lseek(handle.fileno(), 0, os.SEEK_CUR))
+
+        with patch.object(Path, "open", track_open):
             self.assertEqual(limits.classify(self.root, Path(".DS_Store"))[0], "BINARY")
-        opener().read.assert_called_once_with(8)
+        self.assertEqual(raw_positions, [8])
 
     def test_ignored_finder_metadata_is_classified_without_following_symlinks(self):
         subprocess.run(["git", "init", "-q", str(self.root)], check=True)
