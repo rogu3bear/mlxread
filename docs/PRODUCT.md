@@ -6,6 +6,12 @@ Hear selected text comfortably without leaving the current task. Keep speech
 local and the interface easy to read, with each control connected to a useful
 listening decision.
 
+## Requirements proposals
+
+[Clear readiness and recovery for local listening](PRD-READINESS-AND-RECOVERY.md)
+is a draft PRD for the existing native app. Its scope and targets are proposed;
+it does not select an A/B/C approach or change the dated results below.
+
 ## MVP Definition
 
 Existing native macOS menu-bar app: selection capture, local synthesis, voice

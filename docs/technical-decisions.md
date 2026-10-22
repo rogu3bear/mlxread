@@ -1,5 +1,13 @@
 # Technical decisions
 
+## Architecture decision records
+
+Proposed changes are separate from the implemented decisions below.
+
+- [ADR-001: Derived operation readiness](adr/001-operation-readiness.md) —
+  Proposed. Share prerequisite queries across app surfaces while preserving
+  separate preview, menu-reading, shortcut, and playback semantics.
+
 ## Dependency pin
 
 | Dependency | Version | Commit | License |

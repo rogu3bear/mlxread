@@ -1,0 +1,1126 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>MLXRead — readiness and recovery screen study</title>
+<style>
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  color: var(--foreground, #242428);
+  font: 14px/1.5 var(--font-sans, system-ui, sans-serif);
+}
+button, input, select, textarea { font: inherit; }
+button, select { cursor: pointer; }
+button:disabled { cursor: default; }
+button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible, summary:focus-visible {
+  outline: 3px solid #1577dc;
+  outline-offset: 3px;
+}
+.review-label {
+  margin: 0 0 8px;
+  color: var(--muted-foreground, #73737b);
+  font-size: 11px;
+  letter-spacing: .07em;
+  text-transform: uppercase;
+}
+.review-intro { margin: 0 0 14px; max-width: 670px; }
+.review-controls { display: flex; flex-wrap: wrap; align-items: end; gap: 12px; margin-bottom: 12px; }
+.review-controls label { display: block; font-size: 12px; font-weight: 600; margin-bottom: 5px; }
+.review-controls select, .review-button {
+  border: 1px solid var(--border, #c9c9cf);
+  border-radius: 7px;
+  padding: 8px 10px;
+  background: var(--card, #fff);
+  color: var(--foreground, #202024);
+  font-size: 12px;
+  min-height: 36px;
+}
+.case-control { flex: 1 1 300px; }
+.case-control select { width: 100%; }
+.review-note { min-height: 42px; margin: 8px 0 12px; color: var(--muted-foreground, #73737b); font-size: 12px; }
+.stage-scroll { width: 100%; overflow-x: auto; padding-bottom: 10px; }
+.desktop {
+  --ui-bg: #f3f3f5;
+  --ui-panel: #fff;
+  --ui-toolbar: #e9e9ed;
+  --ui-text: #202025;
+  --ui-secondary: #64646c;
+  --ui-line: #d8d8df;
+  --ui-button: #fff;
+  --ui-blue: #006ddd;
+  --ui-banner: #eef4fc;
+  --ui-warning: #7b5206;
+  --ui-error: #a62c2b;
+  --ui-soft: #f8f8fa;
+  position: relative;
+  width: 640px;
+  height: 788px;
+  margin: 0 auto;
+  padding: 16px;
+  color: var(--ui-text);
+  font-family: -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+  font-size: 13px;
+}
+.desktop[data-theme="dark"] {
+  --ui-bg: #28282d;
+  --ui-panel: #333338;
+  --ui-toolbar: #323237;
+  --ui-text: #f2f2f5;
+  --ui-secondary: #b9b9c2;
+  --ui-line: #505058;
+  --ui-button: #505057;
+  --ui-blue: #0a75dd;
+  --ui-banner: #273d53;
+  --ui-warning: #f5c368;
+  --ui-error: #ffb0ac;
+  --ui-soft: #2b2b30;
+}
+.desktop p { margin: 0; }
+.os-bar {
+  height: 30px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 12px;
+  background: var(--ui-toolbar);
+  border: 1px solid var(--ui-line);
+  border-radius: 7px;
+  font-size: 12px;
+}
+.os-bar .document-label { font-weight: 600; }
+.status-button {
+  position: relative;
+  min-width: 36px;
+  height: 26px;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--ui-text);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.status-button[aria-expanded="true"] { background: var(--ui-button); }
+.status-button svg { width: 19px; height: 19px; }
+.attention-badge {
+  position: absolute;
+  top: 1px;
+  right: 3px;
+  width: 11px;
+  height: 11px;
+  border-radius: 50%;
+  background: var(--ui-warning);
+  color: var(--ui-bg);
+  font: 700 9px/11px system-ui;
+  text-align: center;
+}
+.source-window {
+  position: absolute;
+  top: 72px;
+  left: 32px;
+  width: 576px;
+  height: 630px;
+  border: 1px solid var(--ui-line);
+  border-radius: 11px;
+  background: var(--ui-panel);
+  padding: 28px;
+}
+.source-window h2 { font-size: 20px; margin: 12px 0 18px; }
+.source-window .source-kicker { font-size: 12px; color: var(--ui-secondary); }
+.source-window .passage { font: 18px/1.8 Georgia, serif; margin-bottom: 26px; }
+.source-window mark { background: #c9e2ff; color: #193047; padding: 3px 0; }
+.source-window .source-hint { font-size: 13px; line-height: 1.6; color: var(--ui-secondary); }
+.source-window .source-actions { margin-top: 24px; display: flex; gap: 10px; }
+.mac-window {
+  position: absolute;
+  top: 60px;
+  left: 19px;
+  width: 602px;
+  border: 1px solid var(--ui-line);
+  border-radius: 11px;
+  overflow: hidden;
+  background: var(--ui-bg);
+  box-shadow: 0 14px 30px #0002, 0 2px 5px #0001;
+}
+.titlebar {
+  position: relative;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--ui-toolbar);
+  border-bottom: 1px solid var(--ui-line);
+  font-size: 12px;
+  font-weight: 600;
+}
+.traffic { position: absolute; left: 13px; display: flex; align-items: center; gap: 7px; }
+.traffic span, .traffic button {
+  width: 11px;
+  height: 11px;
+  border: 0;
+  padding: 0;
+  border-radius: 50%;
+  display: block;
+}
+.traffic button { background: #ff6259; }
+.traffic span:nth-child(2) { background: #ffbd2e; }
+.traffic span:nth-child(3) { background: #29c942; }
+.settings-content { width: 600px; height: 680px; }
+.tabs {
+  display: flex;
+  align-items: stretch;
+  justify-content: center;
+  gap: 8px;
+  height: 64px;
+  padding: 6px 12px;
+  background: var(--ui-toolbar);
+  border-bottom: 1px solid var(--ui-line);
+}
+.tab {
+  min-width: 82px;
+  padding: 4px 12px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--ui-text);
+  font-size: 12px;
+}
+.tab svg { display: block; width: 20px; height: 20px; margin: 0 auto 2px; }
+.tab[aria-selected="true"] { background: var(--ui-button); box-shadow: 0 1px 2px #0001; }
+.tab:disabled { opacity: .58; }
+.scroll-body { height: 616px; overflow-y: auto; padding: 18px 22px 24px; scrollbar-gutter: stable; }
+.screen-heading { margin: 0 0 12px; }
+.screen-heading h1 { font-size: 20px; line-height: 1.2; letter-spacing: -.02em; margin: 0 0 5px; }
+.screen-heading p { color: var(--ui-secondary); font-size: 13px; }
+.context-row {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 14px;
+  margin-bottom: 12px;
+  border-radius: 7px;
+  background: var(--ui-banner);
+  font-size: 13px;
+}
+.context-row p { flex: 1; line-height: 1.4; }
+.context-row strong { font-weight: 600; }
+.context-row button { flex: 0 0 auto; }
+.group { padding: 12px 14px; border: 1px solid var(--ui-line); border-radius: 8px; background: var(--ui-panel); margin-bottom: 12px; }
+.form-row { display: flex; align-items: center; justify-content: space-between; gap: 14px; min-height: 29px; }
+.form-row + .form-row { margin-top: 5px; }
+.form-row > label { min-width: 110px; }
+.form-row .value { flex: 1; text-align: right; }
+.form-row select { min-width: 185px; max-width: 275px; }
+.native-button, .desktop select {
+  background: var(--ui-button);
+  color: var(--ui-text);
+  border: 1px solid var(--ui-line);
+  border-radius: 5px;
+  min-height: 25px;
+  padding: 3px 10px;
+  font-size: 13px;
+  line-height: 1.35;
+}
+.native-button.primary { background: var(--ui-blue); border-color: var(--ui-blue); color: #fff; }
+.native-button:disabled { opacity: .42; }
+.desktop .secondary { color: var(--ui-secondary); }
+.desktop .small { font-size: 12px; line-height: 1.45; }
+.desktop .warning { color: var(--ui-warning); }
+.desktop .error { color: var(--ui-error); }
+.num { font-variant-numeric: tabular-nums; }
+.sample-group summary { font-weight: 600; cursor: pointer; margin-bottom: 8px; }
+.sample-group textarea {
+  display: block;
+  resize: vertical;
+  width: 100%;
+  height: 54px;
+  min-height: 48px;
+  max-height: 130px;
+  border: 1px solid var(--ui-line);
+  background: var(--ui-soft);
+  color: var(--ui-text);
+  border-radius: 5px;
+  padding: 7px 9px;
+  font-size: 14px;
+  line-height: 1.4;
+}
+.sample-footer { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-top: 8px; }
+.speed-control { display: flex; align-items: center; gap: 8px; }
+.speed-control input { width: 125px; accent-color: var(--ui-blue); }
+.text-button { color: var(--ui-blue); border: 0; background: transparent; padding: 3px 0; font-size: 12px; }
+.voices-header { display: flex; align-items: center; justify-content: space-between; margin: 12px 0 7px; }
+.voices-header h2 { font-size: 13px; margin: 0; }
+.voice-search {
+  width: 100%;
+  height: 28px;
+  border-radius: 5px;
+  border: 1px solid var(--ui-line);
+  background: var(--ui-panel);
+  color: var(--ui-text);
+  padding: 4px 9px;
+  margin-bottom: 7px;
+}
+.voice-list { border: 1px solid var(--ui-line); border-radius: 8px; overflow: hidden; background: var(--ui-panel); }
+.voice-row { display: flex; align-items: center; gap: 10px; padding: 9px 12px; min-height: 54px; }
+.voice-row + .voice-row { border-top: 1px solid var(--ui-line); }
+.voice-name { flex: 1; min-width: 0; }
+.voice-name strong { display: block; font-size: 13px; font-weight: 600; }
+.voice-name span { display: block; font-size: 12px; color: var(--ui-secondary); }
+.voice-row .use-slot { min-width: 66px; text-align: center; }
+.voice-row .selected { color: var(--ui-secondary); font-size: 12px; }
+.voice-footnote { color: var(--ui-secondary); font-size: 12px; line-height: 1.4; margin-top: 9px !important; }
+.blank-list { padding: 16px; font-size: 13px; color: var(--ui-secondary); }
+.model-card h2 { font-size: 14px; margin: 0; }
+.model-card .model-title { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.model-card .model-description { margin: 4px 0 11px; color: var(--ui-secondary); font-size: 13px; }
+.model-actions { display: flex; align-items: center; gap: 9px; margin-top: 11px; }
+.model-card details { margin-top: 10px; color: var(--ui-secondary); font-size: 12px; }
+.model-card details p { margin-top: 6px; }
+.model-card .model-status { font-size: 13px; }
+.progress-track { height: 5px; background: var(--ui-line); border-radius: 6px; overflow: hidden; margin: 9px 0 6px; }
+.progress-track span { height: 100%; display: block; width: 42%; background: var(--ui-blue); }
+.permission-card h2 { font-size: 14px; margin: 0 0 10px; }
+.permission-card .permission-copy { margin: 11px 0; line-height: 1.5; }
+.permission-status { font-size: 13px; font-weight: 600; }
+.status-line { display: flex; align-items: center; justify-content: space-between; gap: 18px; margin: 8px 0; }
+.menu-popover {
+  position: absolute;
+  top: 48px;
+  right: 16px;
+  width: 302px;
+  padding: 8px;
+  border: 1px solid var(--ui-line);
+  border-radius: 9px;
+  background: var(--ui-panel);
+  box-shadow: 0 10px 22px #0003;
+  z-index: 20;
+}
+.menu-head { padding: 8px 9px; }
+.menu-head strong { display: block; font-size: 13px; }
+.menu-head p { font-size: 12px; color: var(--ui-secondary); line-height: 1.45; margin-top: 4px; }
+.menu-item {
+  width: 100%;
+  min-height: 29px;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--ui-text);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 4px 9px;
+  text-align: left;
+  font-size: 13px;
+}
+.menu-item:hover:not(:disabled), .menu-item:focus-visible { background: var(--ui-blue); color: #fff; }
+.menu-item:disabled { opacity: .45; }
+.menu-divider { height: 1px; background: var(--ui-line); margin: 6px 6px; }
+.menu-context { padding: 4px 9px; color: var(--ui-secondary); font-size: 12px; }
+.shortcut { font-size: 12px; font-variant-numeric: tabular-nums; }
+.hud {
+  position: absolute;
+  bottom: 25px;
+  right: 30px;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: var(--ui-panel);
+  border: 1px solid var(--ui-line);
+  border-radius: 9px;
+  padding: 12px 16px;
+  box-shadow: 0 6px 20px #0002;
+}
+.hud .hud-status { min-width: 120px; }
+.mac-window.setup-window { left: 39px; width: 562px; }
+.setup-content { width: 560px; height: 460px; padding: 24px; }
+.setup-content h1 { margin: 0 0 6px; font-size: 22px; }
+.setup-content .setup-subtitle { color: var(--ui-secondary); margin-bottom: 20px; }
+.setup-step { display: flex; gap: 12px; align-items: start; margin: 16px 0; }
+.step-marker { width: 22px; height: 22px; border: 1px solid var(--ui-line); border-radius: 50%; text-align: center; flex: 0 0 auto; }
+.setup-step strong { display: block; margin-bottom: 4px; }
+.setup-step p { color: var(--ui-secondary); line-height: 1.45; }
+.setup-actions { display: flex; gap: 10px; align-items: center; margin-top: 22px; }
+.setup-actions .spacer { flex: 1; }
+.prototype-footer { margin-top: 12px; color: var(--muted-foreground, #73737b); font-size: 12px; line-height: 1.5; }
+.prototype-footer details { margin-top: 12px; }
+.prototype-footer summary { cursor: pointer; }
+.prototype-footer ul { padding-left: 20px; }
+@media (max-width: 640px) {
+  .desktop { margin: 0; }
+  .review-intro { font-size: 13px; }
+}
+</style>
+</head>
+<body>
+<p class="review-label">Screen design proposal · simulated native state</p>
+<p class="review-intro">Try the recovery path, compare a voice, or inspect a model preview. The controls below change this prototype only: no speech, downloads, permission changes, or saved Mac preferences.</p>
+<div class="review-controls">
+  <div class="case-control">
+    <label for="review-case">Review case</label>
+    <select id="review-case"></select>
+  </div>
+  <div>
+    <label for="appearance">Native appearance</label>
+    <select id="appearance"><option value="light">Light</option><option value="dark">Dark</option></select>
+  </div>
+  <button class="review-button" id="environment-step">Simulate access granted</button>
+</div>
+<p class="review-note" id="review-note" aria-live="polite">Voice previews work before selection access is granted. Open the menu-bar icon to inspect the recovery route.</p>
+<div class="stage-scroll">
+  <div class="desktop" id="desktop" data-theme="light"></div>
+</div>
+<div class="prototype-footer">
+  <p>Settings content stays 600 × 680 pt; setup stays 560 × 460 pt. Narrow review panes scroll the fixed Mac layout instead of turning it into a phone UI. Voice, Models, Permissions, the menu, setup, and playback controls are interactive. General and Report are retained context.</p>
+  <details>
+    <summary>Design boundaries and source owners</summary>
+    <ul>
+      <li>Voice Preview auditions without changing the reading voice. Use selects it.</li>
+      <li>Models Use &amp; Preview selects the model and plays a sample, preserving the existing effect.</li>
+      <li>A static menu-bar warning makes unavailable actions discoverable. A dead shortcut cannot receive a request.</li>
+      <li>Recovery opens the existing destination and focuses the relevant control; it never replays selected text automatically.</li>
+      <li>Voice catalogs are representative fixtures. Existing language filters and the remaining menu commands are retained outside this focused study.</li>
+      <li>The HTML study demonstrates layout and proposed transitions. Native focus, Accessibility, event taps, audio, and runtime races still need separate verification after the app resumes.</li>
+    </ul>
+  </details>
+</div>
+<script>
+'use strict';
+
+const sampleText = 'A good book invites us to discover new ideas. Take a moment to listen, settle in, and find a pace that feels comfortable.';
+const models = {
+  chatterbox: {name: 'Chatterbox Turbo · English', short: 'Chatterbox', size: '3.5 GB', summary: 'One built-in English voice.', defaultVoice: 'default', voiceLabel: 'English voice'},
+  kokoro: {name: 'Kokoro 82M', short: 'Kokoro', size: '360 MB', summary: 'Local voices in several languages.', defaultVoice: 'af_heart', voiceLabel: 'Heart'},
+  qwen: {name: 'Qwen3 · Expressive', short: 'Qwen3', size: '3.1 GB', summary: 'Choose reading language and delivery.', defaultVoice: 'ryan', voiceLabel: 'Ryan'},
+  pocket: {name: 'Pocket · Lightweight', short: 'Pocket', size: '240 MB', summary: 'Compact English voices.', defaultVoice: 'alba', voiceLabel: 'Alba'},
+  soprano: {name: 'Soprano 80M', short: 'Soprano', size: '200 MB', summary: 'One English voice.', defaultVoice: 'default', voiceLabel: 'English voice'}
+};
+const voiceCatalog = {
+  kokoro: [
+    {id: 'af_heart', name: 'Heart', language: 'English (US)'},
+    {id: 'af_bella', name: 'Bella', language: 'English (US)'},
+    {id: 'bf_emma', name: 'Emma', language: 'English (UK)'}
+  ],
+  pocket: [
+    {id: 'alba', name: 'Alba', language: 'English'},
+    {id: 'cosette', name: 'Cosette', language: 'English'}
+  ],
+  qwen: [
+    {id: 'ryan', name: 'Ryan', language: 'English native voice'},
+    {id: 'aiden', name: 'Aiden', language: 'English native voice'},
+    {id: 'dylan', name: 'Dylan', language: 'Chinese dialect only', chineseOnly: true}
+  ],
+  chatterbox: [{id: 'default', name: 'English voice', language: 'English'}],
+  soprano: [{id: 'default', name: 'English voice', language: 'English'}]
+};
+const cases = [
+  {id: 'permission', label: 'Voice is ready · selection access missing'},
+  {id: 'shortcut', label: 'Shortcut unavailable · start in the original app'},
+  {id: 'download', label: 'Download failed · retry and complete'},
+  {id: 'missing', label: 'Model missing · setup already closed'},
+  {id: 'voice', label: 'Saved voice missing · audition an alternative'},
+  {id: 'models', label: 'Models · Use & Preview keeps its selecting effect'},
+  {id: 'language', label: 'Voice and language restriction'},
+  {id: 'empty', label: 'Empty preview passage'},
+  {id: 'error', label: 'Reading failed · preserve the explanation'},
+  {id: 'busy', label: 'Reading active · Stop and active pace'},
+  {id: 'setup', label: 'Existing setup · separate access and voice readiness'},
+  {id: 'stale', label: 'Prerequisite disappears just before the next action'}
+];
+
+let state;
+let currentCase = 'permission';
+let lastNote = '';
+const $ = id => document.getElementById(id);
+const escapeHtml = value => String(value).replace(/[&<>"']/g, char => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'}[char]));
+const busy = () => state.phase !== 'idle';
+const selectedVoice = () => state.savedVoices[state.model];
+const voiceName = id => {
+  const found = Object.values(voiceCatalog).flat().find(voice => voice.id === id);
+  return found ? found.name : id;
+};
+
+function icon(name) {
+  const paths = {
+    wave: '<path d="M3 9v6M7 5v14M11 2v20M15 6v12M19 9v6"/>',
+    voice: '<circle cx="9" cy="7" r="3"/><path d="M3 20v-3a6 6 0 0 1 12 0v3M17 6c3 2 3 6 0 8M20 3c5 4 5 10 0 14"/>',
+    general: '<path d="M3 6h18M3 12h18M3 18h18"/><circle cx="8" cy="6" r="2"/><circle cx="16" cy="12" r="2"/><circle cx="9" cy="18" r="2"/>',
+    models: '<rect x="3" y="5" width="18" height="15" rx="3"/><path d="M6 10h12M6 14h12M6 17h3"/>',
+    permissions: '<rect x="4" y="10" width="16" height="12" rx="3"/><path d="M8 10V7a4 4 0 0 1 8 0v3M12 14v4"/>',
+    report: '<path d="M4 4h16v12h-9l-5 4v-4H4zM12 7v4M12 13v.1"/>'
+  };
+  return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' + (paths[name] || paths.wave) + '</svg>';
+}
+
+function button(label, action, options = {}) {
+  return '<button type="button" class="native-button ' + (options.primary ? 'primary' : '') +
+    '" data-action="' + action + '" data-value="' + escapeHtml(options.value || '') +
+    '" id="' + (options.id || action) + '" ' + (options.disabled ? 'disabled ' : '') +
+    (options.aria ? 'aria-label="' + escapeHtml(options.aria) + '" ' : '') + '>' + label + '</button>';
+}
+
+function baseState() {
+  return {
+    model: 'kokoro',
+    savedVoices: {kokoro: 'af_heart', pocket: 'alba', qwen: 'ryan', chatterbox: 'default', soprano: 'default'},
+    assets: {chatterbox: 'missing', kokoro: 'ready', qwen: 'missing', pocket: 'ready', soprano: 'missing'},
+    permission: true,
+    shortcut: 'active',
+    phase: 'idle',
+    previewVoice: null,
+    activeSpeed: null,
+    speed: 1,
+    sample: sampleText,
+    query: '',
+    language: 'en-US',
+    delivery: 'Natural',
+    missingVoice: null,
+    error: '',
+    pendingRemoval: false,
+    view: 'voice',
+    windowOpen: true,
+    setupOpen: false,
+    menuOpen: false,
+    selectionAvailable: true,
+    showHUD: false,
+    hudHidden: false,
+    permissionRequested: false
+  };
+}
+
+function note(message) {
+  lastNote = message;
+  $('review-note').textContent = message;
+}
+
+function setCase(id) {
+  currentCase = id;
+  state = baseState();
+  $('review-case').value = id;
+  if (id === 'permission') {
+    state.permission = false;
+    state.shortcut = 'off';
+  } else if (id === 'shortcut') {
+    state.shortcut = 'retry';
+    state.windowOpen = false;
+  } else if (id === 'download') {
+    state.assets.kokoro = 'failed';
+    state.view = 'models';
+  } else if (id === 'missing') {
+    state.assets.kokoro = 'missing';
+  } else if (id === 'voice') {
+    state.missingVoice = 'af_heart';
+  } else if (id === 'models') {
+    state.view = 'models';
+  } else if (id === 'language') {
+    state.model = 'qwen';
+    state.assets.qwen = 'ready';
+  } else if (id === 'empty') {
+    state.sample = '';
+  } else if (id === 'error') {
+    state.error = 'No selected text was found. Return to your app, select accessible text, and try again.';
+    state.selectionAvailable = false;
+  } else if (id === 'busy') {
+    state.phase = 'speaking';
+    state.activeSpeed = 1;
+    state.windowOpen = false;
+    state.showHUD = true;
+  } else if (id === 'setup') {
+    state.permission = false;
+    state.shortcut = 'off';
+    state.assets.kokoro = 'missing';
+    state.windowOpen = false;
+    state.setupOpen = true;
+  } else if (id === 'stale') {
+    state.pendingRemoval = true;
+  }
+  const descriptions = {
+    permission: 'Voice preview is usable. Selection access is a separate step, reached directly from the menu or the banner.',
+    shortcut: 'Begin with the menu closed. The warning is discoverable without claiming that a broken shortcut received a request.',
+    download: 'Retry the failed download. Use the environment control to move through checking and completion, then preview.',
+    missing: 'Closing setup is not asset readiness. The saved voice remains visible while an explicit download is needed.',
+    voice: 'Heart remains the saved choice. Preview Bella without changing it, then choose Use if you want a replacement.',
+    models: 'The current selecting effect is explicit: Use & Preview changes the model and plays its sample.',
+    language: 'Dylan can preview in Chinese but cannot be used for English reading. The incompatible action stays disabled.',
+    empty: 'The preview action explains its empty state. Use sample text or type a passage; no engine starts from empty input.',
+    error: 'The error stays visible until a deliberate retry or relevant recovery. No captured passage is shown here.',
+    busy: 'The original app keeps focus. Change the future pace in Settings; the active display keeps 1× until another read.',
+    setup: 'Access and voice preparation are separate. Granting access still closes this setup window, preserving current behavior.',
+    stale: 'The next preview request simulates missing assets discovered at action time. It must fail safely instead of trusting the display.'
+  };
+  note(descriptions[id]);
+  render();
+}
+
+function assetStatus(model = state.model) {
+  return state.assets[model];
+}
+
+function selectedVoiceUsable() {
+  if (selectedVoice() === state.missingVoice) return false;
+  return !(state.model === 'qwen' && selectedVoice() === 'dylan' && state.language !== 'zh');
+}
+
+function selectionBlocker() {
+  if (!state.permission) return 'permission';
+  if (assetStatus() !== 'ready') return 'model';
+  if (!selectedVoiceUsable()) return 'voice';
+  return null;
+}
+
+function attentionText() {
+  if (busy()) return state.phase === 'preparing' ? 'Preparing speech. Open menu to stop.' : 'Speaking. Open menu to stop.';
+  const blocker = selectionBlocker();
+  if (blocker === 'permission') return 'Selection access needed. Open menu for options.';
+  if (blocker === 'model') return 'Voices need attention. Open menu for options.';
+  if (blocker === 'voice') return 'Reading voice unavailable. Open menu to choose a voice.';
+  if (state.error) return 'Reading failed. Open menu for recovery.';
+  if (state.shortcut !== 'active') return 'Shortcut unavailable. Open menu to retry or read from the menu.';
+  return 'Ready to read selected text.';
+}
+
+function banner() {
+  if (busy()) {
+    const word = state.phase === 'preparing' ? 'Preparing preview…' : 'Speaking…';
+    return '<div class="context-row"><p><strong>' + word + '</strong><br><span class="small">Current pace ' +
+      state.activeSpeed + '×. Changes apply to the next reading.</span></p>' +
+      button('Stop', 'stop', {id: 'voice-stop'}) + '</div>';
+  }
+  if (state.error) {
+    return '<div class="context-row"><p class="error">' + escapeHtml(state.error) + '</p></div>';
+  }
+  if (selectionBlocker() === 'voice') {
+    return '<div class="context-row"><p><strong>Reading voice unavailable</strong><br><span class="small">Preview another voice, then choose Use.</span></p></div>';
+  }
+  if (!state.permission && assetStatus() === 'ready') {
+    return '<div class="context-row"><p><strong>Voice previews are ready.</strong><br><span class="small">Selection reading needs Accessibility access.</span></p>' +
+      button('Open Permissions…', 'open-view', {value: 'permissions', id: 'voice-permissions'}) + '</div>';
+  }
+  if (state.shortcut !== 'active' && state.permission && assetStatus() === 'ready') {
+    return '<div class="context-row"><p><strong>Read from the menu while the shortcut recovers.</strong></p>' +
+      button(state.shortcut === 'starting' ? 'Starting…' : 'Retry Shortcut', 'retry-shortcut',
+        {id: 'voice-shortcut', disabled: state.shortcut === 'starting'}) + '</div>';
+  }
+  return '';
+}
+
+function assetBody(model) {
+  const info = models[model];
+  const status = assetStatus(model);
+  if (status === 'ready') return '<p class="model-status">Ready to preview</p>';
+  if (status === 'downloading') {
+    return '<p class="model-status num">Downloading · 42%</p><div class="progress-track"><span></span></div>' +
+      '<div class="model-actions">' + button('Cancel', 'cancel-download', {value: model, id: 'cancel-' + model}) + '</div>';
+  }
+  if (status === 'checking' || status === 'cancelling' || status === 'deleting') {
+    return '<p class="model-status">' + ({checking: 'Checking downloaded files…', cancelling: 'Cancelling download…', deleting: 'Deleting model…'}[status]) + '</p>';
+  }
+  const failed = status === 'failed';
+  return [
+    '<p class="model-status ' + (failed ? 'error' : '') + '">' + (failed ? 'The download did not finish.' : 'Download needed') + '</p>',
+    '<p class="secondary small" style="margin-top:5px">' + (failed ? 'Your voice choice is saved. Retry when your connection is available.' : 'Add these local voices to your Mac.') + '</p>',
+    '<div class="model-actions">',
+    button(failed ? 'Retry Download' : 'Download · ' + info.size, 'download',
+      {value: model, primary: true, id: 'download-' + model}),
+    '</div>',
+    failed ? '<details><summary>Download details</summary><p>The connection was interrupted before all model files arrived.</p></details>' : '',
+    model === 'kokoro' ? '<p class="secondary small" style="margin-top:10px">The first preview may also download pronunciation files.</p>' : ''
+  ].join('');
+}
+
+function voiceRows() {
+  const list = voiceCatalog[state.model].filter(voice => voice.id !== state.missingVoice);
+  const matching = list.filter(voice => (voice.name + ' ' + voice.language).toLowerCase().includes(state.query.toLowerCase()));
+  if (!matching.length) return '<div class="blank-list">No matching voices. Clear the search to see available voices.</div>';
+  return matching.map(voice => {
+    const active = busy() && state.previewVoice === voice.id;
+    const usable = !voice.chineseOnly || state.language === 'zh';
+    const chosen = selectedVoice() === voice.id;
+    return [
+      '<div class="voice-row">',
+      '<div class="voice-name"><strong>' + escapeHtml(voice.name) + '</strong><span>' + escapeHtml(voice.language) + '</span></div>',
+      button(active ? 'Stop' : (voice.chineseOnly && !usable ? 'Preview Chinese' : 'Preview'),
+        active ? 'stop' : 'preview',
+        {value: voice.id, id: 'preview-' + voice.id, aria: (active ? 'Stop ' : 'Preview ') + voice.name,
+         disabled: !state.sample.trim() || (busy() && !active)}),
+      '<div class="use-slot">' + (chosen ? '<span class="selected">Selected</span>' :
+        button('Use', 'use-voice', {value: voice.id, id: 'use-' + voice.id, aria: 'Use ' + voice.name + ' for reading',
+          disabled: busy() || !usable})) + '</div>',
+      '</div>'
+    ].join('');
+  }).join('');
+}
+
+function voiceScreen() {
+  const modelOptions = Object.entries(models).map(([id, model]) =>
+    '<option value="' + id + '" ' + (state.model === id ? 'selected' : '') + '>' + escapeHtml(model.name) + '</option>').join('');
+  const selectedLabel = voiceName(selectedVoice()) + (selectedVoice() === state.missingVoice ? ' (unavailable)' : '');
+  const normalVoiceContent = assetStatus() === 'ready' ? [
+    '<details class="group sample-group" open><summary>Preview passage and speed</summary>',
+    '<textarea id="sample" aria-label="Voice preview passage" ' + (busy() ? 'disabled' : '') + '>' + escapeHtml(state.sample) + '</textarea>',
+    '<div class="sample-footer"><button type="button" class="text-button" data-action="sample-reset" id="sample-reset" ' + (busy() ? 'disabled' : '') + '>Use sample text</button>',
+    '<div class="speed-control"><label for="speed">Pace</label><input id="speed" type="range" min="0.5" max="2" step="0.05" value="' + state.speed + '"><span class="num" id="speed-label">' + state.speed + '×</span></div></div></details>',
+    '<div class="voices-header"><h2>Voice previews</h2><span class="secondary small">Use keeps a voice for reading</span></div>',
+    '<input id="voice-search" class="voice-search" type="search" aria-label="Find a voice" placeholder="Find a voice" value="' + escapeHtml(state.query) + '">',
+    !state.sample.trim() ? '<p class="small secondary" style="margin-bottom:8px">Enter a passage or use the sample to preview a voice.</p>' : '',
+    '<div class="voice-list" id="voice-list">' + voiceRows() + '</div>',
+    '<p class="voice-footnote">Voice previews stay on this Mac and do not change your reading voice.</p>'
+  ].join('') : '<div class="group">' + assetBody(state.model) + '</div>';
+  return [
+    '<header class="screen-heading"><h1>Voice</h1><p>Find a voice and pace that feel comfortable.</p></header>',
+    banner(),
+    '<div class="group"><div class="form-row"><label for="model-picker">Speech engine</label><select id="model-picker" ' + (busy() ? 'disabled' : '') + '>' + modelOptions + '</select></div>',
+    '<div class="form-row"><span>Reading voice</span><strong class="value">' + escapeHtml(selectedLabel) + '</strong></div>',
+    state.model === 'qwen'
+      ? '<div class="form-row"><label for="language">Reading language</label><select id="language" ' + (busy() ? 'disabled' : '') + '><option value="en-US" ' + (state.language === 'en-US' ? 'selected' : '') + '>English</option><option value="zh" ' + (state.language === 'zh' ? 'selected' : '') + '>Chinese</option></select></div>' +
+        '<div class="form-row"><label for="delivery">Delivery</label><select id="delivery"><option>Natural</option><option>Narration</option><option>Expressive</option></select></div>'
+      : '',
+    '</div>',
+    normalVoiceContent
+  ].join('');
+}
+
+function modelScreen() {
+  return '<header class="screen-heading"><h1>Models</h1><p>Download a model, then choose how to listen.</p></header>' +
+    Object.entries(models).map(([id, info]) => {
+      const current = id === state.model;
+      const ready = assetStatus(id) === 'ready';
+      return [
+        '<section class="group model-card" id="model-card-' + id + '">',
+        '<div class="model-title"><h2>' + escapeHtml(info.name) + '</h2>' + (current ? '<span class="secondary small">Selected</span>' : '') + '</div>',
+        '<p class="model-description">' + info.summary + '</p>',
+        assetBody(id),
+        ready ? '<div class="model-actions">' +
+          button(current && busy() ? 'Stop' : current ? 'Preview' : 'Use &amp; Preview',
+            current && busy() ? 'stop' : 'model-preview',
+            {value: id, id: 'model-preview-' + id, primary: !current, disabled: busy() && !current}) +
+          (!current ? button('Use Model', 'use-model', {value: id, id: 'use-model-' + id, disabled: busy()}) : '') +
+          '</div>' + (!current ? '<p class="small secondary" style="margin-top:7px">Use &amp; Preview selects this model for future readings.</p>' : '') : '',
+        '<details><summary>Model details</summary><p>Approximate download: ' + info.size + '. Model and voice settings remain on this Mac.</p></details>',
+        '</section>'
+      ].join('');
+    }).join('');
+}
+
+function permissionScreen() {
+  const shortcutText = !state.permission ? 'Needs selection access' :
+    state.shortcut === 'active' ? 'Active' : state.shortcut === 'starting' ? 'Starting…' : 'Unavailable';
+  return [
+    '<header class="screen-heading"><h1>Permissions</h1><p>Selection access and the shortcut are separate checks.</p></header>',
+    '<section class="group permission-card"><h2>Read selected text</h2>',
+    '<div class="status-line"><span>Accessibility</span><span class="permission-status">' + (state.permission ? 'Granted' : 'Not granted') + '</span></div>',
+    '<p class="permission-copy secondary">Allow MLXRead to read selected text in other apps. Voice samples can play without this access.</p>',
+    button(state.permission ? 'Open Accessibility Settings…' : 'Grant Accessibility Access…',
+      'request-permission', {id: 'grant-access', primary: !state.permission}),
+    '</section>',
+    '<section class="group permission-card"><h2>Option–Escape shortcut</h2>',
+    '<div class="status-line"><span>Global shortcut</span><span class="permission-status ' + (state.shortcut === 'retry' ? 'warning' : '') + '">' + shortcutText + '</span></div>',
+    '<p class="permission-copy secondary">' + (!state.permission ? 'The shortcut can start after Accessibility access is granted.' :
+      state.shortcut === 'active' ? 'Select text in your app. Press Option–Escape to read, then press it again to stop.' :
+      'You can still use Read Selection from the menu while the shortcut recovers.') + '</p>',
+    state.permission && state.shortcut !== 'active'
+      ? button(state.shortcut === 'starting' ? 'Starting…' : 'Retry Shortcut', 'retry-shortcut',
+        {id: 'permission-retry', primary: true, disabled: state.shortcut === 'starting'}) : '',
+    '</section>',
+    '<p class="small secondary">If macOS Speak Selection also uses Option–Escape, change its shortcut in System Settings. MLXRead will not change that setting for you.</p>'
+  ].join('');
+}
+
+function tabButton(id, label) {
+  const retained = id === 'general' || id === 'report';
+  return '<button type="button" role="tab" class="tab" data-action="open-view" data-value="' + id +
+    '" id="tab-' + id + '" aria-selected="' + (state.view === id) + '" ' +
+    (retained ? 'disabled title="Retained; not changed in this design study"' : '') + '>' + icon(id) + label + '</button>';
+}
+
+function settingsWindow() {
+  return [
+    '<section class="mac-window" aria-label="MLXRead Settings prototype">',
+    '<div class="titlebar"><div class="traffic"><button type="button" data-action="close-window" aria-label="Close Settings"></button><span></span><span></span></div>MLXRead Settings</div>',
+    '<div class="settings-content">',
+    '<nav class="tabs" role="tablist" aria-label="Settings tabs">',
+    tabButton('voice', 'Voice'), tabButton('general', 'General'), tabButton('models', 'Models'),
+    tabButton('permissions', 'Permissions'), tabButton('report', 'Report'),
+    '</nav><main class="scroll-body" id="settings-body" role="tabpanel">',
+    state.view === 'models' ? modelScreen() : state.view === 'permissions' ? permissionScreen() : voiceScreen(),
+    '</main></div></section>'
+  ].join('');
+}
+
+function setupWindow() {
+  return [
+    '<section class="mac-window setup-window" aria-label="MLXRead Setup prototype">',
+    '<div class="titlebar"><div class="traffic"><button type="button" data-action="close-setup" aria-label="Close Setup"></button><span></span><span></span></div>MLXRead Setup</div>',
+    '<div class="setup-content"><h1>Welcome to MLXRead</h1><p class="setup-subtitle">Select text. Press Option–Escape. Listen.</p>',
+    '<div class="setup-step"><span class="step-marker">1</span><div><strong>Allow selection access</strong><p>Accessibility lets MLXRead read your selection and use its shortcut. Reading text stays on this Mac.</p></div></div>',
+    '<div class="setup-step"><span class="step-marker">2</span><div><strong>Prepare a voice</strong><p>Download a model and preview a voice. A permission grant alone does not prepare these files.</p></div></div>',
+    '<div class="setup-step"><span class="step-marker">3</span><div><strong>Return to your text</strong><p>If Option–Escape does not work, open the MLXRead menu-bar icon for its status and recovery actions.</p></div></div>',
+    '<div class="setup-actions">' + button('Grant Accessibility Access…', 'request-permission', {primary: true, id: 'setup-grant'}) +
+      '<span class="spacer"></span>' + button('Close Setup', 'close-setup', {id: 'setup-close'}) + '</div>',
+    '<div style="margin-top:13px">' + button('Open Settings…', 'open-view', {value: 'voice', id: 'setup-settings'}) + '</div>',
+    '</div></section>'
+  ].join('');
+}
+
+function menuItem(label, action, options = {}) {
+  return '<button type="button" role="menuitem" class="menu-item" data-action="' + action +
+    '" data-value="' + (options.value || '') + '" id="' + (options.id || 'menu-' + action) + '" ' +
+    (options.disabled ? 'disabled' : '') + '><span>' + label + '</span>' +
+    (options.shortcut ? '<span class="shortcut">' + options.shortcut + '</span>' : '') + '</button>';
+}
+
+function menuPopover() {
+  const blocker = selectionBlocker();
+  let title = busy() ? (state.phase === 'preparing' ? 'Preparing speech…' : 'Speaking') :
+    state.error ? 'Couldn’t read the selection' :
+    blocker === 'permission' ? 'Selection access needed' :
+    blocker === 'model' ? 'Voices need attention' :
+    blocker === 'voice' ? 'Reading voice unavailable' :
+    state.shortcut !== 'active' ? 'Shortcut unavailable' : 'Ready to read';
+  let message = state.error || (blocker === 'permission' ? 'Voice previews remain available.' :
+    blocker === 'model' ? 'Open Models to download or repair the selected model.' :
+    blocker === 'voice' ? 'Choose an available voice. Your saved choice has not changed.' :
+    state.shortcut !== 'active' ? 'Read from this menu while the shortcut recovers.' :
+    'Select text in your original app, then read.');
+  if (busy()) message = 'Current pace ' + state.activeSpeed + '×. Stop ends this session.';
+  return [
+    '<div class="menu-popover" id="native-menu" role="menu" aria-label="MLXRead menu">',
+    '<div class="menu-head"><strong>' + title + '</strong><p>' + escapeHtml(message) + '</p></div>',
+    menuItem('Read Selection', 'read-selection', {id: 'menu-read', disabled: busy() || Boolean(blocker), shortcut: '⌘R'}),
+    menuItem('Stop', 'stop', {id: 'menu-stop', disabled: !busy(), shortcut: '⌘.'}),
+    '<div class="menu-divider"></div>',
+    blocker === 'permission' ? menuItem('Open Permissions…', 'open-view', {value: 'permissions', id: 'menu-permissions'}) : '',
+    blocker === 'model' ? menuItem('Open Models…', 'open-view', {value: 'models', id: 'menu-models'}) : '',
+    blocker === 'voice' ? menuItem('Choose Voice…', 'open-view', {value: 'voice', id: 'menu-voice'}) : '',
+    !busy() && state.permission && state.shortcut !== 'active' ? menuItem(state.shortcut === 'starting' ? 'Starting shortcut…' : 'Retry Shortcut',
+      'retry-shortcut', {id: 'menu-retry', disabled: state.shortcut === 'starting'}) : '',
+    menuItem('Preview Voices…', 'open-view', {value: 'voice', id: 'menu-preview', disabled: busy()}),
+    '<div class="menu-divider"></div>',
+    '<div class="menu-context">Model: ' + escapeHtml(models[state.model].short) + '</div>',
+    '<div class="menu-context">Voice: ' + escapeHtml(voiceName(selectedVoice())) + ' · Pace ' + state.speed + '×</div>',
+    menuItem('Settings…', 'open-view', {value: 'voice', id: 'menu-settings', shortcut: '⌘,'}),
+    '</div>'
+  ].join('');
+}
+
+function environmentLabel() {
+  if (Object.values(state.assets).includes('downloading')) return 'Simulate files received';
+  if (Object.values(state.assets).includes('checking')) return 'Simulate validation complete';
+  if (Object.values(state.assets).includes('cancelling')) return 'Simulate writer stopped';
+  if (state.phase === 'preparing') return 'Simulate speech begins';
+  if (busy()) return 'Simulate natural completion';
+  if (!state.permission) return 'Simulate access granted';
+  if (state.shortcut === 'starting') return 'Simulate shortcut active';
+  return 'Simulate shortcut attempt';
+}
+
+function render(focusId) {
+  const previous = document.activeElement;
+  const previousId = previous && previous.id;
+  const selection = previous && typeof previous.selectionStart === 'number'
+    ? [previous.selectionStart, previous.selectionEnd] : null;
+  const scrolling = $('settings-body') ? $('settings-body').scrollTop : 0;
+  const attention = !busy() && (Boolean(selectionBlocker()) || state.shortcut !== 'active' || Boolean(state.error));
+  const html = [
+    '<div class="os-bar"><span class="document-label">Original app <span class="secondary">· public test passage</span></span>',
+    '<button type="button" id="status-icon" class="status-button" data-action="toggle-menu" title="' + escapeHtml(attentionText()) +
+      '" aria-label="MLXRead: ' + escapeHtml(attentionText()) + '" aria-haspopup="menu" aria-expanded="' + state.menuOpen + '">' +
+      icon('wave') + (attention ? '<span class="attention-badge" aria-hidden="true">!</span>' : '') + '</button></div>',
+    '<section class="source-window" ' + (state.windowOpen || state.setupOpen ? 'inert aria-hidden="true"' : '') + '><p class="source-kicker">SIMULATED ORIGINAL APPLICATION</p><h2>Keep your place.</h2>',
+    '<p class="passage"><mark>This selected passage stays in its original app. MLXRead reads it locally.</mark></p>',
+    '<p class="source-hint">The MLXRead icon is in the menu bar. Its warning is static; opening the menu reveals the available action and recovery route.</p>',
+    '<div class="source-actions">' + button('Open MLXRead Settings', 'open-view', {value: 'voice', id: 'source-settings'}) + '</div></section>',
+    state.windowOpen ? settingsWindow() : '',
+    state.setupOpen ? setupWindow() : '',
+    busy() && state.showHUD && !state.hudHidden ? '<div class="hud"><span class="hud-status">' +
+      (state.phase === 'preparing' ? 'Preparing speech…' : 'Speaking') + '</span>' +
+      button('Stop', 'stop', {id: 'hud-stop'}) + '<span class="num">' + state.activeSpeed + '×</span>' +
+      button('Hide', 'hide-hud', {id: 'hud-hide'}) + '</div>' : '',
+    state.menuOpen ? menuPopover() : ''
+  ].join('');
+  $('desktop').innerHTML = html;
+  $('environment-step').textContent = environmentLabel();
+  if ($('settings-body')) $('settings-body').scrollTop = focusId ? 0 : scrolling;
+  const requestedTarget = $(focusId || previousId);
+  const target = requestedTarget && !requestedTarget.disabled ? requestedTarget :
+    focusId ? $('tab-' + state.view) || $('status-icon') : null;
+  if (target && !target.disabled) {
+    target.focus({preventScroll: !focusId});
+    if (selection && !focusId && typeof target.setSelectionRange === 'function' && target.type !== 'range') {
+      try { target.setSelectionRange(selection[0], selection[1]); } catch (_) {}
+    }
+  }
+}
+
+function openView(view) {
+  state.view = view;
+  state.windowOpen = true;
+  state.setupOpen = false;
+  state.menuOpen = false;
+  const focus = view === 'permissions' ? (state.permission && state.shortcut === 'retry' ? 'permission-retry' : 'grant-access') :
+    view === 'models' ? (assetStatus() === 'ready' ? 'model-preview-' + state.model : 'download-' + state.model) :
+    assetStatus() === 'ready' ? 'voice-search' : 'download-' + state.model;
+  render(focus);
+  note('Proposed destination: ' + view + '. Focus moves to the relevant existing control. No speech starts on navigation.');
+}
+
+function setModel(id) {
+  if (busy()) return;
+  state.model = id;
+  state.query = '';
+  state.language = 'en-US';
+  state.error = '';
+}
+
+function guardRequest() {
+  if (state.pendingRemoval) {
+    state.pendingRemoval = false;
+    state.assets[state.model] = 'missing';
+    state.error = 'These voices are no longer available. Download them again before reading.';
+    note('The simulated runtime check rejected a stale-ready action. No sample played and no download started.');
+    render();
+    return false;
+  }
+  return true;
+}
+
+function startPreview(id) {
+  if (busy() || !state.sample.trim() || assetStatus() !== 'ready' || id === state.missingVoice) return;
+  if (!guardRequest()) return;
+  state.previewVoice = id;
+  state.phase = 'preparing';
+  state.activeSpeed = state.speed;
+  state.error = '';
+  render('preview-' + id);
+  note('Simulated local preview. The saved reading voice is still ' + voiceName(selectedVoice()) + '. Use the environment control to advance playback.');
+}
+
+function finishSpeech() {
+  state.phase = 'idle';
+  state.previewVoice = null;
+  state.activeSpeed = null;
+  state.hudHidden = false;
+}
+
+function advanceEnvironment() {
+  const entry = Object.entries(state.assets).find(([, status]) => ['downloading', 'checking', 'cancelling'].includes(status));
+  if (entry) {
+    const [id, status] = entry;
+    state.assets[id] = status === 'downloading' ? 'checking' : status === 'checking' ? 'ready' : 'missing';
+    note(status === 'downloading' ? 'Files received; validation is still pending.' :
+      status === 'checking' ? 'Validation completed. The model is ready to preview; it did not start speaking automatically.' :
+      'The download writer stopped. An explicit new download is now available.');
+  } else if (state.phase === 'preparing') {
+    state.phase = 'speaking';
+    note('Simulated speech has begun. This HTML study produces no audio.');
+  } else if (busy()) {
+    finishSpeech();
+    note('Simulated reading finished. Readiness is derived again from current conditions.');
+  } else if (!state.permission) {
+    state.permission = true;
+    state.shortcut = 'starting';
+    if (state.setupOpen) state.setupOpen = false;
+    note('Simulated access grant. Existing setup closes on grant; missing model assets stay missing.');
+  } else if (state.shortcut === 'starting') {
+    state.shortcut = 'active';
+    note('Simulated shortcut recovery completed. No previous selection is replayed.');
+  } else {
+    if (state.shortcut !== 'active') {
+      note('No shortcut event was received. The static menu-bar warning remains the discovery route.');
+    } else {
+      dispatch('read-selection');
+      return;
+    }
+  }
+  render();
+}
+
+function dispatch(action, value) {
+  if (action === 'open-view') { openView(value || 'voice'); return; }
+  if (action === 'toggle-menu') {
+    state.menuOpen = !state.menuOpen;
+    render(state.menuOpen ? (busy() ? 'menu-stop' : selectionBlocker() === 'permission' ? 'menu-permissions' :
+      selectionBlocker() === 'model' ? 'menu-models' : selectionBlocker() === 'voice' ? 'menu-voice' : 'menu-read') : 'status-icon');
+    return;
+  }
+  if (action === 'close-window') state.windowOpen = false;
+  if (action === 'close-setup') state.setupOpen = false;
+  if (action === 'stop') {
+    finishSpeech();
+    note('Stopped. No stale audio or automatic restart is implied by the design.');
+  }
+  if (action === 'hide-hud') {
+    state.hudHidden = true;
+    note('Playback controls hidden for this reading. The simulated speech continues.');
+  }
+  if (action === 'request-permission') {
+    state.permissionRequested = true;
+    note('This control requests macOS Accessibility access. The prototype cannot grant it; use Simulate access granted to review the next state.');
+  }
+  if (action === 'retry-shortcut' && state.permission && !busy()) {
+    state.shortcut = 'starting';
+    note('Shortcut recovery requested. Menu reading remains available while it starts.');
+  }
+  if (action === 'sample-reset' && !busy()) state.sample = sampleText;
+  if (action === 'preview') { startPreview(value); return; }
+  if (action === 'use-voice' && !busy()) {
+    const voice = voiceCatalog[state.model].find(item => item.id === value);
+    if (voice && (!voice.chineseOnly || state.language === 'zh')) {
+      state.savedVoices[state.model] = value;
+      state.error = '';
+      note(voice.name + ' is now the reading voice. Nothing played.');
+    }
+  }
+  if (action === 'use-model' && !busy()) {
+    setModel(value);
+    note(models[value].short + ' selected for future readings. No sample played.');
+  }
+  if (action === 'model-preview' && !busy() && state.assets[value] === 'ready') {
+    setModel(value);
+    state.previewVoice = selectedVoice();
+    state.phase = 'preparing';
+    state.activeSpeed = state.speed;
+    note('Use & Preview selected ' + models[value].short + ' and its saved voice, then started a simulated sample.');
+  }
+  if (action === 'download' && !busy()) {
+    state.assets[value] = 'downloading';
+    state.error = '';
+    note('Download explicitly requested. Use Simulate files received to inspect checking and completion.');
+  }
+  if (action === 'cancel-download') {
+    state.assets[value] = 'cancelling';
+    note('Cancellation remains visible until the writer stops.');
+  }
+  if (action === 'read-selection') {
+    state.menuOpen = false;
+    if (busy() || selectionBlocker()) { render(); return; }
+    if (!guardRequest()) return;
+    if (state.windowOpen || !state.selectionAvailable) {
+      state.error = 'No selected text was found. Return to your app, select accessible text, and try again.';
+      note('Selection capture failed in the simulated current context. The error is retained; no captured text is displayed.');
+    } else {
+      state.phase = 'preparing';
+      state.activeSpeed = state.speed;
+      state.previewVoice = null;
+      state.error = '';
+      note('Reading began in the simulated original application. No real selection was captured.');
+    }
+  }
+  render();
+}
+
+$('desktop').addEventListener('click', event => {
+  const control = event.target.closest('[data-action]');
+  if (control && !control.disabled) dispatch(control.dataset.action, control.dataset.value);
+});
+$('desktop').addEventListener('input', event => {
+  if (event.target.id === 'sample') {
+    state.sample = event.target.value;
+    render();
+  } else if (event.target.id === 'voice-search') {
+    state.query = event.target.value;
+    render();
+  } else if (event.target.id === 'speed') {
+    state.speed = Math.round(Number(event.target.value) * 100) / 100;
+    $('speed-label').textContent = state.speed + '×';
+  }
+});
+$('desktop').addEventListener('change', event => {
+  if (event.target.id === 'model-picker') { setModel(event.target.value); render('model-picker'); }
+  if (event.target.id === 'language') { state.language = event.target.value; render('language'); }
+  if (event.target.id === 'delivery') state.delivery = event.target.value;
+});
+$('desktop').addEventListener('keydown', event => {
+  if (event.key === 'Escape' && state.menuOpen) {
+    event.preventDefault();
+    state.menuOpen = false;
+    render('status-icon');
+  }
+  if (state.menuOpen && ['ArrowDown', 'ArrowUp', 'Home', 'End'].includes(event.key)) {
+    event.preventDefault();
+    const items = [...document.querySelectorAll('#native-menu button:not(:disabled)')];
+    let index = items.indexOf(document.activeElement);
+    index = event.key === 'Home' ? 0 : event.key === 'End' ? items.length - 1 :
+      (index + (event.key === 'ArrowDown' ? 1 : -1) + items.length) % items.length;
+    items[index].focus();
+  }
+});
+$('review-case').innerHTML = cases.map(item => '<option value="' + item.id + '">' + item.label + '</option>').join('');
+$('review-case').addEventListener('change', event => setCase(event.target.value));
+$('appearance').addEventListener('change', event => $('desktop').dataset.theme = event.target.value);
+$('environment-step').addEventListener('click', advanceEnvironment);
+
+function runPrototypeChecks() {
+  const checks = [];
+  setCase('permission');
+  const savedVoice = selectedVoice();
+  dispatch('preview', 'af_bella');
+  checks.push(busy() && selectedVoice() === savedVoice && !state.permission);
+  dispatch('stop');
+  dispatch('open-view', 'permissions');
+  checks.push(document.activeElement.id === 'grant-access');
+  setCase('models');
+  dispatch('model-preview', 'pocket');
+  checks.push(state.model === 'pocket' && selectedVoice() === 'alba' && busy() && state.savedVoices.kokoro === 'af_heart');
+  setCase('shortcut');
+  advanceEnvironment();
+  checks.push(!state.windowOpen && !state.menuOpen && !busy());
+  dispatch('toggle-menu');
+  checks.push(!$('menu-read').disabled && Boolean($('menu-retry')));
+  dispatch('read-selection');
+  checks.push(busy());
+  setCase('download');
+  state.sample = 'A temporary edited sample.';
+  dispatch('download', 'kokoro');
+  checks.push(assetStatus() === 'downloading');
+  advanceEnvironment();
+  checks.push(assetStatus() === 'checking');
+  advanceEnvironment();
+  checks.push(assetStatus() === 'ready' && !busy() && state.sample === 'A temporary edited sample.' && selectedVoice() === 'af_heart');
+  setCase('empty');
+  dispatch('preview', 'af_heart');
+  checks.push(!busy() && $('preview-af_heart').disabled);
+  setCase('stale');
+  dispatch('preview', 'af_heart');
+  checks.push(!busy() && assetStatus() === 'missing' && Boolean(state.error));
+  setCase('language');
+  checks.push($('use-dylan').disabled && !$('preview-dylan').disabled);
+  setCase('busy');
+  state.speed = 1.5;
+  render();
+  checks.push(state.activeSpeed === 1);
+  dispatch('hide-hud');
+  checks.push(busy() && !$('hud-stop'));
+  setCase('setup');
+  advanceEnvironment();
+  checks.push(!state.setupOpen && state.permission && assetStatus() === 'missing');
+  setCase('permission');
+  const content = document.querySelector('.settings-content').getBoundingClientRect();
+  const viewport = $('settings-body').getBoundingClientRect();
+  const primary = $('preview-af_heart').getBoundingClientRect();
+  const geometry = {
+    contentWidth: Math.round(content.width),
+    contentHeight: Math.round(content.height),
+    primaryInFirstView: primary.top >= viewport.top && primary.bottom <= viewport.bottom,
+    pageOverflow: document.documentElement.scrollWidth > window.innerWidth
+  };
+  console.log('MLXREAD_SCREEN_CHECKS', JSON.stringify({checks: checks.length, allPassed: checks.every(Boolean), geometry}));
+  if (!checks.every(Boolean)) console.error('A prototype interaction check failed.');
+}
+window.mlxreadDesign = {
+  setCase,
+  dispatch,
+  advance: advanceEnvironment,
+  state: () => JSON.parse(JSON.stringify(state)),
+  theme: value => { $('appearance').value = value; $('desktop').dataset.theme = value; },
+  note: () => lastNote
+};
+runPrototypeChecks();
+/* REVIEW_STATE_OVERRIDE */
+</script>
+</body>
+</html>
+
