@@ -1,6 +1,6 @@
 ---
 artifact: prd
-version: "1.1"
+version: "1.2"
 created: 2026-10-22
 status: draft
 ---
@@ -71,6 +71,13 @@ an undetected external change. M4 uses a public passage and consistent task
 instructions; five participants provide directional evidence, not statistical
 lift. Record scenario IDs, raw outcomes, actions, and times manually in existing
 task evidence. Add no analytics, private passages, or scheduled research.
+
+The [draft S1 protocol](DESIGN-SPRINT-PROTOTYPE-PLAN.md#repeatable-task-protocol)
+proposes fixed first-exposure conditions, eligibility, tasks, assistance limits,
+outcome rules, and a native M4 transfer. Its prepared-audio prototype score is
+separate from M4. Human baseline/candidate comparison requires comparable
+first-exposure cohorts; repeated or coached attempts are not a baseline. Review
+and freeze the protocol before use; no sessions or results are established here.
 
 ### Non-Goals
 
@@ -293,7 +300,7 @@ remain separately scoped actions.
 - [ ] Accept, revise, or decline ADR-001's shared-query design. Owner: James with the native owner; before dependent code changes.
 - [ ] Confirm exact recovery copy and placement within existing surfaces. Owner: James/design with native owner; before UI changes.
 - [ ] Identify participants and a manual observation window for M4. Owner: James/product owner; before scheduling sessions.
-- [ ] Resolve PM finding F-04: freeze participant characteristics, fixed starting conditions, scenario assignments, allowed instructions, timeout/abandonment, and successful-read criteria before comparing baseline and candidate; report by scenario. Owner: James/product owner; before M-D.
+- [ ] Resolve PM finding F-04 by reviewing and freezing the [proposed S1 protocol and native transfer](DESIGN-SPRINT-PROTOTYPE-PLAN.md#repeatable-task-protocol): confirm target, participant criteria, conditions, task wording, assistance/timeouts, and actual successful-read endpoint before comparison. Prototype sessions do not satisfy M4. Owner: James/product owner; before M-D.
 - [ ] Re-review proposed dispositions for F-01/02/03/05 against the screen study and acceptance matrix; native verification remains outstanding. Owner: James with design/native owner; before engineering handoff.
 
 ## Appendix
@@ -302,6 +309,7 @@ remain separately scoped actions.
 
 - [Customer job](CUSTOMER.md), [product](PRODUCT.md), and [positioning](POSITIONING.md) — existing intent and its evidence limits.
 - [Approach options](APPROACH-OPTIONS.md) — three draft organizing approaches; no winner selected.
+- [Sprint map and target](DESIGN-SPRINT-MAP-AND-TARGET.md) and [prototype plan](DESIGN-SPRINT-PROTOTYPE-PLAN.md) — proposed learning target, storyboard, interview protocol, and execution prerequisites; no sprint sign-off or participant results.
 - [ADR-001](adr/001-operation-readiness.md) and [architecture](architecture.md) — proposed and implemented technical context, respectively.
 - [Design](DESIGN.md), [experiments](EXPERIMENTS.md), and [testing](testing.md) — established UI direction and dated evidence.
 - [Privacy](privacy.md) and [contributing](../CONTRIBUTING.md) — invariants, native setup, and verification entrypoints.
@@ -312,3 +320,4 @@ remain separately scoped actions.
 | --- | --- | --- | --- |
 | 1.0 | 2026-10-22 | Codex; prepared for James | Initial draft; scope, targets, and implementation remain unapproved |
 | 1.1 | 2026-10-22 | Codex; prepared for James | Screen-design proposal distinguishes preview effects, adds discovery and completed recovery, and extends the matrix to 15 groups. F-04 remains open; other findings have proposed dispositions pending re-review and native proof. Status remains draft |
+| 1.2 | 2026-10-22 | Codex; prepared for James | Links the proposed sprint map and repeatable S1 study protocol, with native M4 and first-exposure comparison boundaries. F-04 has a proposed protocol pending review/freeze; no study, implementation, or approval is implied |

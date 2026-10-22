@@ -15,6 +15,12 @@ not an implemented app change or an accepted A/B/C approach. Source baseline:
 `12b2abdd234bc64e53f54aa0fd15f954a35a2194`. The historical implementation
 and native checks later in this document retain their original date and scope.
 
+The [sprint map and target](DESIGN-SPRINT-MAP-AND-TARGET.md) recommends testing
+closed-menu recovery discovery. The [prototype plan](DESIGN-SPRINT-PROTOTYPE-PLAN.md)
+defines a proposed participant version and repeatable interview protocol. The
+existing HTML study remains a reviewer artifact: its diagnostic labels and
+source-app hints must not be mistaken for an unprompted participant test.
+
 **Task:** Know which listening action is available, recover a blocked one,
 and return to the original passage. Keep the existing tabbed Settings window
 at 600 × 680 pt, setup at 560 × 460 pt, the menu, and optional playback panel.
@@ -109,7 +115,7 @@ Its findings remain traceable; this design is not an independent re-review.
 | F-01 / P1: Preview conflates audition and model selection | Separate Voice Preview/Use from Models Use & Preview; PRD FR-4 and AC-13 specify both. | Review the wording and verify actual preferences/playback after native resume. |
 | F-02 / P1: Shortcut recovery lacks discovery | Static menu-bar warning, help text, setup fallback, and closed-menu starting condition in AC-07. | Validate native behavior and human discovery; no discoverability claim yet. |
 | F-03 / P1: Asset acceptance stops before successful recovery | Failure → explicit Retry → checking → ready → successful preview/read in AC-14. | Real transport failure, incomplete assets, and successful recovery remain unrun. |
-| F-04 / P2: M4 has no repeatable usability protocol | Remains open in the PRD. | Define and freeze participants, conditions, assignments, instructions, abandonment, and success before M-D. |
+| F-04 / P2: M4 has no repeatable usability protocol | The [prototype plan](DESIGN-SPRINT-PROTOTYPE-PLAN.md#repeatable-task-protocol) proposes fixed S1 conditions, first-exposure recruitment, tasks, assistance/timeout rules, and a separate native M4 transfer. | Review and freeze the protocol before use. Target, roster, participants, and trial remain unconfirmed; simulated audio cannot satisfy native M4. |
 | F-05 / P2: Stale-ready transition is missing | AC-15 adds both permission and asset changes before action; study shows the asset case. | Verify real runtime guards; a simulated transition is not proof. |
 
 HTML checks on 2026-10-22: 15 interaction assertions and 8 layout/focus assertions
