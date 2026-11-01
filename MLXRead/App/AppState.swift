@@ -22,7 +22,24 @@ final class AppSettings {
             defaults.set(speechSpeed, forKey: Constants.DefaultsKey.speechSpeed)
         }
     }
-    var clipboardFallbackEnabled: Bool { didSet { defaults.set(clipboardFallbackEnabled, forKey: Constants.DefaultsKey.clipboardFallbackEnabled) } }
+    var clipboardFallbackEnabled: Bool {
+        didSet {
+            // The two clipboard fallbacks are mutually exclusive: enabling
+            // one silently disables the other.
+            if clipboardFallbackEnabled, rawClipboardFallbackEnabled {
+                rawClipboardFallbackEnabled = false
+            }
+            defaults.set(clipboardFallbackEnabled, forKey: Constants.DefaultsKey.clipboardFallbackEnabled)
+        }
+    }
+    var rawClipboardFallbackEnabled: Bool {
+        didSet {
+            if rawClipboardFallbackEnabled, clipboardFallbackEnabled {
+                clipboardFallbackEnabled = false
+            }
+            defaults.set(rawClipboardFallbackEnabled, forKey: Constants.DefaultsKey.rawClipboardFallbackEnabled)
+        }
+    }
     var showPlaybackHUD: Bool { didSet { defaults.set(showPlaybackHUD, forKey: Constants.DefaultsKey.showPlaybackHUD) } }
     var maximumSelectionLength: Int {
         didSet {
@@ -50,6 +67,7 @@ final class AppSettings {
         let speed = defaults.double(forKey: Constants.DefaultsKey.speechSpeed)
         speechSpeed = speed == 0 || !speed.isFinite ? Constants.Defaults.speechSpeed : min(max(speed, 0.5), 2.0)
         clipboardFallbackEnabled = defaults.object(forKey: Constants.DefaultsKey.clipboardFallbackEnabled) as? Bool ?? Constants.Defaults.clipboardFallbackEnabled
+        rawClipboardFallbackEnabled = defaults.object(forKey: Constants.DefaultsKey.rawClipboardFallbackEnabled) as? Bool ?? Constants.Defaults.rawClipboardFallbackEnabled
         showPlaybackHUD = defaults.object(forKey: Constants.DefaultsKey.showPlaybackHUD) as? Bool ?? Constants.Defaults.showPlaybackHUD
         let storedMax = defaults.integer(forKey: Constants.DefaultsKey.maximumSelectionLength)
         maximumSelectionLength = storedMax == 0 ? Constants.Defaults.maximumSelectionLength : storedMax.clamped(to: Constants.selectionLengthBounds)
@@ -140,6 +158,10 @@ final class AppState {
                 // UserDefaults is thread-safe; read the persisted flag directly.
                 UserDefaults.standard.object(forKey: Constants.DefaultsKey.clipboardFallbackEnabled) as? Bool
                     ?? Constants.Defaults.clipboardFallbackEnabled
+            },
+            rawClipboardFallbackEnabled: { @Sendable in
+                UserDefaults.standard.object(forKey: Constants.DefaultsKey.rawClipboardFallbackEnabled) as? Bool
+                    ?? Constants.Defaults.rawClipboardFallbackEnabled
             }
         )
         let player = StreamingAudioPlayer()

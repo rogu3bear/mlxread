@@ -37,6 +37,9 @@ struct GeneralSettingsView: View {
                 Toggle("Use Copy when an app can’t share its selection", isOn: $settings.clipboardFallbackEnabled)
                 Text("MLXRead briefly copies the selection, then restores your clipboard if nothing else has changed it.")
                     .foregroundStyle(.secondary)
+                Toggle("Use clipboard contents when the selection can’t be read", isOn: $settings.rawClipboardFallbackEnabled)
+                Text("Reads whatever is already on your clipboard. MLXRead never sends keystrokes in this mode.")
+                    .foregroundStyle(.secondary)
                 LabeledContent("Selection limit") {
                     HStack {
                         TextField("Characters", value: $settings.maximumSelectionLength, format: .number)

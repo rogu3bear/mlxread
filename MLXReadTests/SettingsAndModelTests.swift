@@ -91,6 +91,31 @@ final class AppSettingsTests: XCTestCase {
         XCTAssertEqual(settings.maximumSelectionLength, Constants.selectionLengthBounds.upperBound)
     }
 
+    func testClipboardFallbackModesAreMutuallyExclusive() {
+        let settings = AppSettings(defaults: defaults)
+        XCTAssertTrue(settings.clipboardFallbackEnabled)
+        XCTAssertFalse(settings.rawClipboardFallbackEnabled)
+
+        // Enabling the raw mode turns off the ⌘C mode.
+        settings.rawClipboardFallbackEnabled = true
+        XCTAssertFalse(settings.clipboardFallbackEnabled)
+        XCTAssertTrue(settings.rawClipboardFallbackEnabled)
+
+        // And vice versa.
+        settings.clipboardFallbackEnabled = true
+        XCTAssertFalse(settings.rawClipboardFallbackEnabled)
+        XCTAssertTrue(settings.clipboardFallbackEnabled)
+    }
+
+    func testRawClipboardFallbackExclusivityPersists() {
+        let settings = AppSettings(defaults: defaults)
+        settings.rawClipboardFallbackEnabled = true
+
+        let reloaded = AppSettings(defaults: defaults)
+        XCTAssertFalse(reloaded.clipboardFallbackEnabled)
+        XCTAssertTrue(reloaded.rawClipboardFallbackEnabled)
+    }
+
     func testSpeechConfigurationReflectsModel() {
         let settings = AppSettings(defaults: defaults)
         settings.selectedModelID = ModelManifest.soprano.id

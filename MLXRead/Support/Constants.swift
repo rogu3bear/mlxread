@@ -21,6 +21,7 @@ enum Constants {
         static let selectedVoice = "selectedVoice"
         static let speechSpeed = "speechSpeed"
         static let clipboardFallbackEnabled = "clipboardFallbackEnabled"
+        static let rawClipboardFallbackEnabled = "rawClipboardFallbackEnabled"
         static let showPlaybackHUD = "showPlaybackHUD"
         static let maximumSelectionLength = "maximumSelectionLength"
         static let onboardingCompleted = "onboardingCompleted"
@@ -30,6 +31,8 @@ enum Constants {
     enum Defaults {
         static let speechSpeed: Double = 1.0
         static let clipboardFallbackEnabled = true
+        // Mutually exclusive with the ⌘C fallback: enabling one disables the other.
+        static let rawClipboardFallbackEnabled = false
         static let showPlaybackHUD = false
         static let maximumSelectionLength = 20_000
     }
