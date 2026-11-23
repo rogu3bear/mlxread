@@ -81,11 +81,97 @@ final class TextChunkerTests: XCTestCase {
         for chunk in chunks {
             XCTAssertLessThanOrEqual(chunk.count, 600)
         }
-        XCTAssertEqual(chunks.joined().count, 1500)
+        // The trailing period ends the unit like a sentence.
+        XCTAssertEqual(chunks.joined(), monster + ".")
     }
 
     func testDeterminism() {
         let text = "One. Two. Three.\n\nFour five six. Seven."
         XCTAssertEqual(TextChunker.chunk(text), TextChunker.chunk(text))
+    }
+
+    // MARK: - Pauses and sentence endings
+
+    func testParagraphEndsGetParagraphPauseAndFinalChunkNone() {
+        let chunks = TextChunker.chunks("First paragraph.\n\nSecond paragraph.\n\nThird.")
+        XCTAssertEqual(chunks, [
+            TextChunk(text: "First paragraph.", pauseAfter: .paragraph),
+            TextChunk(text: "Second paragraph.", pauseAfter: .paragraph),
+            TextChunk(text: "Third.", pauseAfter: .none),
+        ])
+    }
+
+    func testChunksWithinAParagraphHaveNoPause() {
+        let sentence = "This sentence is about fifty characters long okay."
+        let paragraph = Array(repeating: sentence, count: 6).joined(separator: " ")
+        let chunks = TextChunker.chunks(paragraph + "\n\nNext.", targetLength: 120, maximumLength: 200)
+        XCTAssertGreaterThan(chunks.count, 2)
+        XCTAssertEqual(chunks.dropLast(2).map(\.pauseAfter), Array(repeating: .none, count: chunks.count - 2))
+        XCTAssertEqual(chunks[chunks.count - 2].pauseAfter, .paragraph)
+    }
+
+    func testHeadingGetsPeriod() {
+        let chunks = TextChunker.chunks("Getting Started\n\nInstall the app.")
+        XCTAssertEqual(chunks, [
+            TextChunk(text: "Getting Started.", pauseAfter: .paragraph),
+            TextChunk(text: "Install the app.", pauseAfter: .none),
+        ])
+    }
+
+    func testBulletItemsStandAloneWithLinePauses() {
+        let text = "Steps:\n- open the menu\n• choose Settings\n* done!\n\nAfter the list."
+        XCTAssertEqual(TextChunker.chunks(text), [
+            TextChunk(text: "Steps:", pauseAfter: .line),
+            TextChunk(text: "open the menu.", pauseAfter: .line),
+            TextChunk(text: "choose Settings.", pauseAfter: .line),
+            TextChunk(text: "done!", pauseAfter: .paragraph),
+            TextChunk(text: "After the list.", pauseAfter: .none),
+        ])
+    }
+
+    func testSoftWrappedLinesJoin() {
+        // Hard-wrapped text (PDFs, email) keeps reading as one sentence.
+        XCTAssertEqual(TextChunker.chunks("There are books you can read about\nit at the library."),
+                       [TextChunk(text: "There are books you can read about it at the library.", pauseAfter: .none)])
+    }
+
+    func testLineBreakAfterSentenceIsBoundary() {
+        XCTAssertEqual(TextChunker.chunks("First line ends here.\nthen lowercase."), [
+            TextChunk(text: "First line ends here.", pauseAfter: .line),
+            TextChunk(text: "then lowercase.", pauseAfter: .none),
+        ])
+    }
+
+    func testBrowserCopiedHeadingAndUnmarkedListGetLinePauses() {
+        // Exact text Safari/Chrome copy from a rendered heading, paragraph,
+        // list, and heading: single line breaks and no bullet markers.
+        let text = "models degrade codebase quality over time\nI'm not going to say much more about maintainability. There are a bunch of books you can go read about it\n\nJohn Ousterhout's A Philosophy of Software Design\nRobert C. Martin's Clean Code\nMartin Fowler's Refactoring\n\"But surely the models have gotten better since then\"\n"
+        let chunks = TextChunker.chunks(TextNormalizer.normalize(text, maximumLength: 10_000).text)
+        XCTAssertEqual(chunks, [
+            TextChunk(text: "models degrade codebase quality over time.", pauseAfter: .line),
+            TextChunk(text: "I'm not going to say much more about maintainability. There are a bunch of books you can go read about it.", pauseAfter: .paragraph),
+            TextChunk(text: "John Ousterhout's A Philosophy of Software Design.", pauseAfter: .line),
+            TextChunk(text: "Robert C. Martin's Clean Code.", pauseAfter: .line),
+            TextChunk(text: "Martin Fowler's Refactoring.", pauseAfter: .line),
+            TextChunk(text: "\"But surely the models have gotten better since then\"", pauseAfter: .none),
+        ])
+    }
+
+    func testHyphenWithoutSpaceIsNotABullet() {
+        XCTAssertEqual(TextChunker.chunk("-5 degrees today."), ["-5 degrees today."])
+    }
+
+    func testUnitsEndingInSymbolsGetNoPeriod() {
+        XCTAssertEqual(TextChunker.endingSentence("return []"), "return []")
+        XCTAssertEqual(TextChunker.endingSentence("He said “hi”"), "He said “hi”")
+        XCTAssertEqual(TextChunker.endingSentence("Version 2"), "Version 2.")
+    }
+
+    func testSilenceChunkLength() {
+        let silence = SpeechAudioChunk.silence(seconds: ChunkPause.paragraph.seconds, sampleRate: 24_000, index: 3)
+        XCTAssertEqual(silence?.samples.count, 14_400)
+        XCTAssertEqual(silence?.index, 3)
+        XCTAssertTrue(silence?.samples.allSatisfy { $0 == 0 } ?? false)
+        XCTAssertNil(SpeechAudioChunk.silence(seconds: ChunkPause.none.seconds, sampleRate: 24_000, index: 0))
     }
 }

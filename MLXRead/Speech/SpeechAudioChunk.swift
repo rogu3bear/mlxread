@@ -13,4 +13,11 @@ struct SpeechAudioChunk: Sendable {
         guard sampleRate > 0 else { return 0 }
         return Double(samples.count) / sampleRate
     }
+
+    /// Zero samples lasting `seconds`, or nil when that rounds to no frames.
+    static func silence(seconds: Double, sampleRate: Double, index: Int) -> SpeechAudioChunk? {
+        let frames = Int((seconds * sampleRate).rounded())
+        guard frames > 0 else { return nil }
+        return SpeechAudioChunk(samples: [Float](repeating: 0, count: frames), sampleRate: sampleRate, index: index)
+    }
 }

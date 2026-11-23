@@ -147,12 +147,17 @@ actor NativeMLXSpeechEngine: SpeechEngine {
             guard let model else {
                 throw UserFacingSpeechError.modelLoadFailed("model unavailable after prepare")
             }
+            // The player applies speed to every model except Kokoro, so only
+            // Kokoro's inserted pauses need shortening here.
+            var pauseScale = 1.0
             if let kokoro = model as? KokoroModel {
                 // Let the model adjust phoneme durations before generating audio.
                 // Soprano has no equivalent; its rate stays in the audio player.
-                kokoro.speed = Float(configuration.speed.isFinite ? min(max(configuration.speed, 0.5), 2.0) : 1.0)
+                let speed = configuration.speed.isFinite ? min(max(configuration.speed, 0.5), 2.0) : 1.0
+                kokoro.speed = Float(speed)
+                pauseScale = 1 / speed
             }
-            let pieces = TextChunker.chunk(text)
+            let pieces = TextChunker.chunks(text)
             AppLogger.speech.info("Generating \(pieces.count) chunk(s), \(text.count) chars total")
             var index = 0
             let voice = model is Qwen3TTSModel ? configuration.qwenVoicePrompt
@@ -160,7 +165,7 @@ actor NativeMLXSpeechEngine: SpeechEngine {
             for piece in pieces {
                 try request.checkCancellation()
                 let stream = model.generateStream(
-                    text: piece,
+                    text: piece.text,
                     voice: voice,
                     refAudio: nil,
                     refText: nil,
@@ -185,6 +190,14 @@ actor NativeMLXSpeechEngine: SpeechEngine {
                     }
                 }
                 try request.checkCancellation()
+                if let silence = SpeechAudioChunk.silence(
+                    seconds: piece.pauseAfter.seconds * pauseScale,
+                    sampleRate: Double(model.sampleRate),
+                    index: index
+                ) {
+                    continuation.yield(silence)
+                    index += 1
+                }
             }
             Memory.clearCache()
             continuation.finish()
