@@ -1,3 +1,4 @@
+import AVFoundation
 import XCTest
 @testable import MLXRead
 
@@ -57,9 +58,10 @@ final class IntegrationTests: XCTestCase {
         for chunk in chunks {
             XCTAssertEqual(chunk.sampleRate, expectedRate, file: file, line: line)
             XCTAssertFalse(chunk.samples.isEmpty, file: file, line: line)
-            XCTAssertFalse(chunk.samples.allSatisfy { $0 == 0 }, "audio is pure silence", file: file, line: line)
             XCTAssertTrue(chunk.samples.allSatisfy { $0.isFinite }, "audio contains NaN/inf", file: file, line: line)
         }
+        // Inserted pauses are silent chunks; the read as a whole must not be.
+        XCTAssertFalse(chunks.allSatisfy { $0.samples.allSatisfy { $0 == 0 } }, "audio is pure silence", file: file, line: line)
     }
 
     // MARK: - Soprano
@@ -162,6 +164,34 @@ final class IntegrationTests: XCTestCase {
         let chunks = try await collectChunks(engine: engine, text: text, configuration: SpeechConfiguration(voice: "af_heart"))
         XCTAssertGreaterThanOrEqual(chunks.count, 2, "paragraphs should synthesize as separate chunks")
         XCTAssertEqual(chunks.map(\.index), Array(0..<chunks.count), "chunk indices must be ordered")
+    }
+
+    /// Speaks a heading, a paragraph, a list, and a closing line with Kokoro, checks the
+    /// inserted pauses, and writes the read to a WAV for listening.
+    func testKokoroPausesBetweenParagraphsAndListItems() async throws {
+        let engine = try await downloadedEngine(ModelManifest.kokoro)
+        try await engine.prepare()
+        // Exactly what a browser copies from the rendered markdown.
+        let text = "models degrade codebase quality over time\nI'm not going to say much more about maintainability. There are a bunch of books you can go read about it\n\nJohn Ousterhout's A Philosophy of Software Design\nRobert C. Martin's Clean Code\nMartin Fowler's Refactoring\n\"But surely the models have gotten better since then\"\n"
+        let chunks = try await collectChunks(engine: engine, text: text, configuration: SpeechConfiguration(voice: "af_heart"))
+        assertValidAudio(chunks, expectedRate: 24_000)
+
+        let silent = chunks.filter { $0.samples.allSatisfy { $0 == 0 } }
+        let pauses = silent.map { ($0.duration * 100).rounded() / 100 }
+        // heading, paragraph, book 1, book 2, book 3
+        XCTAssertEqual(pauses, [0.25, 0.6, 0.25, 0.25, 0.25], "inserted pauses: \(pauses)")
+        XCTAssertFalse(chunks.last!.samples.allSatisfy { $0 == 0 }, "no trailing pause")
+
+        let samples = chunks.flatMap(\.samples)
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent("mlxread-paragraph-pauses.wav")
+        let format = AVAudioFormat(standardFormatWithSampleRate: 24_000, channels: 1)!
+        let buffer = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: AVAudioFrameCount(samples.count))!
+        buffer.frameLength = buffer.frameCapacity
+        samples.withUnsafeBufferPointer { buffer.floatChannelData![0].update(from: $0.baseAddress!, count: samples.count) }
+        try? FileManager.default.removeItem(at: url)
+        let file = try AVAudioFile(forWriting: url, settings: format.settings)
+        try file.write(from: buffer)
+        print("PARAGRAPH_PAUSES|wav=\(url.path)|pauses=\(pauses)")
     }
 
     // MARK: - Model download (network)

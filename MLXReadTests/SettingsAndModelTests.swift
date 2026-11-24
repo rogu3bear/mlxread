@@ -617,6 +617,18 @@ final class EnginePreparationTests: XCTestCase {
         XCTAssertEqual(calls, 8)
     }
 
+    func testMockGenerationInsertsSilenceBetweenParagraphs() async throws {
+        let engine = MockSpeechEngine(chunkDelay: .zero, secondsPerChunk: 0.1)
+        var chunks: [SpeechAudioChunk] = []
+        for try await chunk in engine.generate(text: "One.\n\nTwo.", configuration: SpeechConfiguration()) {
+            chunks.append(chunk)
+        }
+        XCTAssertEqual(chunks.map(\.index), [0, 1, 2])
+        XCTAssertEqual(chunks[1].duration, ChunkPause.paragraph.seconds, accuracy: 0.001)
+        XCTAssertTrue(chunks[1].samples.allSatisfy { $0 == 0 })
+        XCTAssertFalse(chunks[2].samples.allSatisfy { $0 == 0 }, "no trailing silence after the last chunk")
+    }
+
     func testMockGenerationCancellation() async throws {
         let engine = MockSpeechEngine(chunkDelay: .milliseconds(200))
         let stream = engine.generate(

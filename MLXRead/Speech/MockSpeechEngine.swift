@@ -35,8 +35,9 @@ actor MockSpeechEngine: SpeechEngine {
         return AsyncThrowingStream { continuation in
             let task = Task {
                 do {
-                    let pieces = TextChunker.chunk(text)
-                    for (index, piece) in pieces.enumerated() {
+                    var index = 0
+                    for chunk in TextChunker.chunks(text) {
+                        let piece = chunk.text
                         try Task.checkCancellation()
                         try await Task.sleep(for: delay)
                         // Pitch varies with chunk content so ordering is audible.
@@ -48,6 +49,13 @@ actor MockSpeechEngine: SpeechEngine {
                             return Float(sin(2 * .pi * frequency * t) * 0.25 * max(0, envelope))
                         }
                         continuation.yield(SpeechAudioChunk(samples: samples, sampleRate: rate, index: index))
+                        index += 1
+                        if let silence = SpeechAudioChunk.silence(
+                            seconds: chunk.pauseAfter.seconds, sampleRate: rate, index: index
+                        ) {
+                            continuation.yield(silence)
+                            index += 1
+                        }
                     }
                     continuation.finish()
                 } catch {
